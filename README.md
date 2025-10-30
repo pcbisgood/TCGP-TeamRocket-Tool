@@ -36,7 +36,7 @@ Found a bug or have a feature request? Please open an issue on the [GitHub Issue
 
 Join our Discord server for support and discussions:
 
-[![Discord](https://img.shields.io/discord/YOUR_DISCORD_ID?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/Msa5vNjUUf)
+[![Discord](label=Discord&logo=discord&logoColor=white)](https://discord.gg/Msa5vNjUUf)
 
 ---
 

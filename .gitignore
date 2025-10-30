@@ -64,6 +64,13 @@ Accounts/
 Images/
 *.png
 
+docs/
+!docs/
+!docs/screenshots/
+!docs/screenshots/*.png
+!docs/screenshots/*.jpg
+!docs/screenshots/*.jpeg
+
 # Cloudflared (scaricato automaticamente dall'app)
 cloudflared.exe
 

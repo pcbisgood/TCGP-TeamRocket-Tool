@@ -11,10 +11,11 @@
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 </div>
 
-[![Preview](https://i.ibb.co/JWTZCpkv/image.png)](https://i.ibb.co/JWTZCpkv/image.png)
-[![Preview](https://i.ibb.co/dsmKLr8X/image.png)](https://i.ibb.co/dsmKLr8X/image.png)
-[![Preview](https://i.ibb.co/60wQ53z1/image.png)](https://i.ibb.co/60wQ53z1/image.png)
-[![Preview](https://i.ibb.co/394ZRTRC/image.png)](https://i.ibb.co/394ZRTRC/image.png)
+![Dashboard](docs/screenshots/dashboard.png)
+![Collection](docs/screenshots/collection.png)
+![Trades](docs/screenshots/trades.png)
+![Mobile](docs/screenshots/mobile.png)
+
 
 
 

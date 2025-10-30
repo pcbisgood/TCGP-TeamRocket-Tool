@@ -63,6 +63,7 @@ except ImportError:
     print("⚠️ windows-toasts not installed")
 
 
+
 # =========================================================================
 # 🎯 GLOBAL CONFIGURATION
 # =========================================================================
@@ -207,21 +208,47 @@ def require_password(f):
     return decorated_function
 
 def extract_trade_data_fast(message):
-    """Extracts trade data from a Discord message."""
+    """
+    Estrae i dati del trade da un messaggio Discord.
+    
+    Priorità per account_name:
+    1. Nome file XML se presente come allegato
+    2. Nome file XML dal testo "File name: xxx.xml"
+    3. "unknown_account" come fallback
+    """
     content = message.content
-    match = ACCOUNT_NAME_PATTERN.search(content)
-    account_name = match.group(1).strip().replace('/', '_').replace('\\', '_') if match else "unknown_account"
     
-    lines = content.split('\n')
-    card_line = ""
+    # 1️⃣ Estrai l'account_name
+    account_name = "unknown_account"
+    
+    # PRIORITÀ 1: Estrai dal file XML allegato
+    for att in message.attachments:
+        if att.filename.endswith(".xml"):
+            account_name = att.filename.replace(".xml", "").strip()
+            break
+    
+    # PRIORITÀ 2: Se non trovato negli allegati, estrai da "File name: xxx.xml" nel testo
+    if account_name == "unknown_account":
+        file_pattern = r'File name: ([\w\-\(\)]+\.xml)'
+        match = re.search(file_pattern, content)
+        if match:
+            xml_filename = match.group(1)
+            account_name = xml_filename.replace(".xml", "").strip()
+    
+    # 2️⃣ Estrai il nome del file XML dal testo
     xml_filename_text = "N/A"
+    file_line_match = re.search(r'File name: ([\w\-\(\)\.]+)', content)
+    if file_line_match:
+        xml_filename_text = file_line_match.group(1)
     
-    for line in lines:
-        if line.startswith("Found:"):
-            card_line = line[7:].strip()
-        elif line.startswith("File name:"):
-            xml_filename_text = line[11:].strip()
+    # 3️⃣ Estrai le carte trovate (formato "Found: CardName (xN)")
+    cards_found = ""
+    cards_pattern = r'Found: ([\w\s]+(?:\s*\(x\d+\))?(?:,\s*[\w\s]+\s*\(x\d+\))*)'
+    cards_match = re.search(cards_pattern, content)
+    if cards_match:
+        cards_found = cards_match.group(1).strip()
     
+    # 4️⃣ Estrai gli allegati (XML e immagine)
     xml_att = None
     image_att = None
     
@@ -230,6 +257,7 @@ def extract_trade_data_fast(message):
             xml_att = att
         elif not image_att and att.filename.endswith(('.png', '.jpg', '.jpeg', '.webp')):
             image_att = att
+        
         if xml_att and image_att:
             break
     
@@ -237,10 +265,12 @@ def extract_trade_data_fast(message):
         "message_id": message.id,
         "account_name": account_name,
         "xml_filename_text": xml_filename_text,
-        "cards_found": card_line,
+        "cards_found": cards_found,
         "message_link": message.jump_url
     }, xml_att, image_att
 
+
+    
 async def download_attachment_fast(session: aiohttp.ClientSession, attachment,
                                    sub_folder: str, filename: str) -> Tuple[Optional[str], str]:
     """Downloads an attachment from Discord."""
@@ -3686,31 +3716,32 @@ class MainWindow(QMainWindow):
         self.activateWindow()
     
     def quit_application(self):
-        """Chiude completamente l'applicazione."""
-        # Ferma tutti i thread
-        if hasattr(self, 'bot_thread') and self.bot_thread:
-            self.bot_thread.stop_bot()
-            self.bot_thread.wait(3000)
-        
-        if hasattr(self, 'scraper_thread') and self.scraper_thread:
-            self.scraper_thread.terminate()
-            self.scraper_thread.wait(3000)
-        
-        if hasattr(self, 'flask_thread') and self.flask_thread:
-            self.flask_thread.stop_server()
-            self.flask_thread.wait(3000)
-        
-        if hasattr(self, 'tunnel_thread') and self.tunnel_thread:
-            self.tunnel_thread.stop_tunnel()
-            self.tunnel_thread.wait(3000)
-        
-        # Nascondi e rimuovi tray icon
-        if hasattr(self, 'tray_icon'):
-            self.tray_icon.hide()
-            self.tray_icon.deleteLater()
-        
-        # Chiudi applicazione
-        QApplication.quit()
+        """✅ SEMPLIFICATO - Chiude l'applicazione."""
+        try:
+            print("🛑 Shutting down...")
+            
+            # Prova a fermare il bot in vari modi
+            if hasattr(self, 'bot_thread') and self.bot_thread:
+                # Metodo 1: Usa stop_bot se esiste
+                if hasattr(self.bot_thread, 'stop_bot'):
+                    self.bot_thread.stop_bot()
+                
+                # Metodo 2: Imposta running a False
+                if hasattr(self.bot_thread, 'running'):
+                    self.bot_thread.running = False
+                
+                # Aspetta che il thread termini
+                self.bot_thread.join(timeout=2)
+            
+            # Chiudi il database
+            if hasattr(self, 'db_manager') and self.db_manager:
+                self.db_manager.close()
+            
+            QApplication.quit()
+            
+        except Exception as e:
+            print(f"❌ Shutdown error: {e}")
+            QApplication.quit()
 
 
     def setup_system_tray(self):
@@ -4392,172 +4423,6 @@ class MainWindow(QMainWindow):
     # SETTINGS
     # =========================================================================
 
-    def create_set_section(self, set_code, set_name, total_cards, cover_path, account_name, cursor):
-        """Crea una sezione collapsible per un set."""
-        try:
-            # Frame principale
-            frame = QFrame()
-            frame.setFrameStyle(QFrame.Box)
-            frame.setStyleSheet("QFrame { border: 1px solid #555; border-radius: 5px; background-color: #353535; }")
-            
-            main_layout = QVBoxLayout(frame)
-            main_layout.setSpacing(0)
-            main_layout.setContentsMargins(5, 5, 5, 5)
-            
-            # Header cliccabile
-            header_btn = QToolButton()
-            header_btn.setCheckable(True)
-            header_btn.setChecked(False)
-            header_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-            header_btn.setArrowType(Qt.RightArrow)
-            header_btn.setStyleSheet("""
-                QToolButton {
-                    border: none;
-                    background: transparent;
-                    font-size: 14px;
-                    font-weight: bold;
-                    padding: 5px;
-                    text-align: left;
-                }
-                QToolButton:hover {
-                    background-color: #454545;
-                }
-            """)
-            
-            # Calcola statistiche del set
-            try:
-                if account_name == "All Accounts":
-                    cursor.execute("""
-                        SELECT COUNT(DISTINCT c.id), SUM(ai.quantity)
-                        FROM cards c
-                        LEFT JOIN account_inventory ai ON c.id = ai.card_id
-                        WHERE c.set_code = ? AND ai.quantity > 0
-                    """, (set_code,))
-                else:
-                    cursor.execute("""
-                        SELECT COUNT(DISTINCT c.id), SUM(ai.quantity)
-                        FROM cards c
-                        LEFT JOIN account_inventory ai ON c.id = ai.card_id
-                        LEFT JOIN accounts a ON ai.account_id = a.account_id
-                        WHERE c.set_code = ? AND ai.quantity > 0 AND a.account_name = ?
-                    """, (set_code, account_name))
-                
-                result = cursor.fetchone()
-                owned_count = result[0] if result and result[0] else 0
-                total_copies = result[1] if result and result[1] else 0
-            except Exception as e:
-                owned_count = 0
-                total_copies = 0
-                print(f"Error calculating stats for {set_code}: {e}")
-            
-            completion = (owned_count / total_cards * 100) if total_cards and total_cards > 0 else 0
-            
-            header_btn.setText(f"  {set_name} ({set_code}) - {owned_count}/{total_cards} ({completion:.0f}%) | {total_copies} copies")
-            
-            main_layout.addWidget(header_btn)
-            
-            # Content (inizialmente nascosto)
-            content = QWidget()
-            content.setVisible(False)
-            content_layout = QVBoxLayout(content)
-            
-            # Grid per le carte
-            cards_widget = QWidget()
-            cards_grid = QGridLayout(cards_widget)
-            cards_grid.setSpacing(5)
-            
-            # Recupera tutte le carte del set
-            try:
-                cursor.execute("""
-                    SELECT id, card_number, card_name, rarity, local_image_path
-                    FROM cards
-                    WHERE set_code = ?
-                    ORDER BY CAST(card_number AS INTEGER)
-                """, (set_code,))
-                cards = cursor.fetchall()
-            except Exception as e:
-                print(f"Error fetching cards for {set_code}: {e}")
-                cards = []
-            
-            # Recupera inventario
-            try:
-                if account_name == "All Accounts":
-                    cursor.execute("""
-                        SELECT c.id, SUM(ai.quantity)
-                        FROM cards c
-                        JOIN account_inventory ai ON c.id = ai.card_id
-                        WHERE c.set_code = ?
-                        GROUP BY c.id
-                    """, (set_code,))
-                else:
-                    cursor.execute("""
-                        SELECT c.id, SUM(ai.quantity)
-                        FROM cards c
-                        JOIN account_inventory ai ON c.id = ai.card_id
-                        JOIN accounts a ON ai.account_id = a.account_id
-                        WHERE c.set_code = ? AND a.account_name = ?
-                        GROUP BY c.id
-                    """, (set_code, account_name))
-                
-                inventory = {row[0]: row[1] for row in cursor.fetchall()}
-            except Exception as e:
-                print(f"Error fetching inventory for {set_code}: {e}")
-                inventory = {}
-            
-            # Crea widget per ogni carta
-            row, col = 0, 0
-            max_cols = 6
-            
-            for card_id, card_number, card_name, rarity, image_path in cards:
-                try:
-                    quantity = inventory.get(card_id, 0)
-                    
-                    card_data = {
-                        'id': card_id,
-                        'card_number': card_number,
-                        'card_name': card_name,
-                        'rarity': rarity,
-                        'local_image_path': image_path
-                    }
-                    
-                    card_widget = CardWidget(card_data, quantity)
-                    cards_grid.addWidget(card_widget, row, col)
-                    
-                    col += 1
-                    if col >= max_cols:
-                        col = 0
-                        row += 1
-                except Exception as e:
-                    print(f"Error creating widget for card {card_id}: {e}")
-                    continue
-            
-            content_layout.addWidget(cards_widget)
-            main_layout.addWidget(content)
-            
-            # Collega il toggle
-            def toggle_content():
-                is_expanded = header_btn.isChecked()
-                content.setVisible(is_expanded)
-                header_btn.setArrowType(Qt.DownArrow if is_expanded else Qt.RightArrow)
-            
-            header_btn.toggled.connect(toggle_content)
-            
-            return frame
-        
-        except Exception as e:
-            import traceback
-            error_msg = traceback.format_exc()
-            print(f"Error creating set section for {set_code}:\n{error_msg}")
-            
-            # Ritorna frame di errore
-            error_frame = QFrame()
-            error_layout = QVBoxLayout(error_frame)
-            error_label = QLabel(f"❌ Error loading set {set_code}: {str(e)}")
-            error_label.setStyleSheet("QLabel { color: #e74c3c; padding: 10px; }")
-            error_layout.addWidget(error_label)
-            return error_frame
-
-
     def refresh_collection(self):
         """Avvia il caricamento della collezione in un thread separato."""
         # Verifica che il database esista
@@ -4671,22 +4536,28 @@ class MainWindow(QMainWindow):
             
             # Cover image (se esiste)
             if cover_path and os.path.exists(cover_path):
-                cover_label = QLabel()
-                cover_pixmap = QPixmap(cover_path)
-                if not cover_pixmap.isNull():
-                    scaled_cover = cover_pixmap.scaled(60, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    cover_label.setPixmap(scaled_cover)
-                    cover_label.setFixedSize(60, 40)
-                    cover_label.setStyleSheet("""
-                        QLabel {
-                            border: 1px solid #555;
-                            border-radius: 3px;
-                            background-color: #2a2a2a;
-                        }
-                    """)
-                    header_layout.addWidget(cover_label)
+                try:
+                    cover_label = QLabel()
+                    cover_pixmap = QPixmap(cover_path)
+                    if not cover_pixmap.isNull():
+                        scaled_cover = cover_pixmap.scaled(60, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        cover_label.setPixmap(scaled_cover)
+                        cover_label.setFixedSize(60, 40)
+                        cover_label.setStyleSheet("""
+                            QLabel {
+                                border: 1px solid #555;
+                                border-radius: 3px;
+                                background-color: #2a2a2a;
+                            }
+                        """)
+                        header_layout.addWidget(cover_label)
+                except Exception as e:
+                    print(f"Error loading cover image for {set_code}: {e}")
             
             # Calcola statistiche del set
+            owned_count = 0
+            total_copies = 0
+            
             try:
                 if account_name == "All Accounts":
                     cursor.execute("""
@@ -4708,9 +4579,9 @@ class MainWindow(QMainWindow):
                 owned_count = result[0] if result and result[0] else 0
                 total_copies = result[1] if result and result[1] else 0
             except Exception as e:
+                print(f"Error calculating stats for {set_code}: {e}")
                 owned_count = 0
                 total_copies = 0
-                print(f"Error calculating stats for {set_code}: {e}")
             
             completion = (owned_count / total_cards * 100) if total_cards and total_cards > 0 else 0
             
@@ -4756,32 +4627,67 @@ class MainWindow(QMainWindow):
             main_layout.addWidget(content_widget)
             
             # =========================================================================
-            # TOGGLE FUNCTION CON LAZY LOADING
+            # TOGGLE FUNCTION CON LAZY LOADING (✅ CORRETTA)
             # =========================================================================
             
             def toggle_content():
-                is_expanded = arrow_btn.isChecked()
-                content_widget.setVisible(is_expanded)
-                arrow_btn.setArrowType(Qt.DownArrow if is_expanded else Qt.RightArrow)
-                
-                # Lazy load delle carte solo la prima volta
-                if is_expanded and not content_widget.cards_loaded:
-                    self.load_set_cards(content_widget, set_code, inventory, cursor)
-                    content_widget.cards_loaded = True
+                """Toggle espansione/collasso con lazy loading."""
+                try:
+                    is_expanded = arrow_btn.isChecked()
+                    content_widget.setVisible(is_expanded)
+                    arrow_btn.setArrowType(Qt.DownArrow if is_expanded else Qt.RightArrow)
+                    
+                    # Lazy load delle carte solo la prima volta
+                    if is_expanded and not content_widget.cards_loaded:
+                        try:
+                            self.load_set_cards(content_widget, set_code, inventory, cursor)
+                            content_widget.cards_loaded = True
+                        except Exception as e:
+                            print(f"❌ Error loading cards for {set_code}: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            
+                            # Mostra messaggio di errore
+                            error_label = QLabel(f"❌ Error loading cards: {str(e)}")
+                            error_label.setStyleSheet("QLabel { color: #e74c3c; padding: 10px; }")
+                            content_widget.layout().addWidget(error_label)
+                            
+                except Exception as e:
+                    print(f"❌ Error in toggle_content: {e}")
+                    import traceback
+                    traceback.print_exc()
             
-            # Evento click per espandere/collassare
-            header_widget.mousePressEvent = lambda event: (
-                arrow_btn.setChecked(not arrow_btn.isChecked()),
-                toggle_content()
-            )
+            # ✅ CORRETTO - Collega il signal toggled direttamente
+            arrow_btn.toggled.connect(toggle_content)
+            
+            # ✅ CORRETTO - Gestisci il click sul header widget in modo sicuro
+            def header_clicked(event):
+                """Gestisce il click sul header per espandere/collassare."""
+                try:
+                    if event.button() == Qt.LeftButton:
+                        arrow_btn.setChecked(not arrow_btn.isChecked())
+                        # toggle_content() verrà chiamato automaticamente dal signal toggled
+                except Exception as e:
+                    print(f"❌ Error in header_clicked: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            header_widget.mousePressEvent = header_clicked
             
             return frame
             
         except Exception as e:
-            print(f"Error creating set section for {set_code}: {e}")
+            print(f"❌ Error creating set section for {set_code}: {e}")
             import traceback
             traceback.print_exc()
-            return None
+            
+            # Ritorna frame di errore
+            error_frame = QFrame()
+            error_layout = QVBoxLayout(error_frame)
+            error_label = QLabel(f"❌ Error loading set {set_code}: {str(e)}")
+            error_label.setStyleSheet("QLabel { color: #e74c3c; padding: 10px; font-size: 12px; }")
+            error_layout.addWidget(error_label)
+            return error_frame
 
     def load_set_cards(self, content_widget, set_code, inventory, cursor):
         """Carica le carte di un set (chiamato solo quando necessario - lazy loading)."""
@@ -4809,22 +4715,25 @@ class MainWindow(QMainWindow):
             
             # Cover image del set
             if cover_path and os.path.exists(cover_path):
-                cover_label = QLabel()
-                cover_pixmap = QPixmap(cover_path)
-                if not cover_pixmap.isNull():
-                    # Scala la cover mantenendo proporzioni
-                    scaled_cover = cover_pixmap.scaled(80, 112, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    cover_label.setPixmap(scaled_cover)
-                    cover_label.setFixedSize(80, 112)
-                    cover_label.setStyleSheet("""
-                        QLabel {
-                            border: 2px solid #555;
-                            border-radius: 5px;
-                            background-color: #2a2a2a;
-                            padding: 2px;
-                        }
-                    """)
-                    header_layout.addWidget(cover_label)
+                try:
+                    cover_label = QLabel()
+                    cover_pixmap = QPixmap(cover_path)
+                    if not cover_pixmap.isNull():
+                        # Scala la cover mantenendo proporzioni
+                        scaled_cover = cover_pixmap.scaled(80, 112, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        cover_label.setPixmap(scaled_cover)
+                        cover_label.setFixedSize(80, 112)
+                        cover_label.setStyleSheet("""
+                            QLabel {
+                                border: 2px solid #555;
+                                border-radius: 5px;
+                                background-color: #2a2a2a;
+                                padding: 2px;
+                            }
+                        """)
+                        header_layout.addWidget(cover_label)
+                except Exception as e:
+                    print(f"Error loading cover image: {e}")
             
             # Info widget (nome e stats)
             info_widget = QWidget()
@@ -4842,21 +4751,30 @@ class MainWindow(QMainWindow):
             code_label.setStyleSheet("QLabel { color: #888; font-size: 11px; }")
             info_layout.addWidget(code_label)
             
-            # Calcola stats (carte possedute/totali)
+            # ✅ CORRETTO - Calcola stats in modo sicuro
+            owned_count = 0
+            total_owned_copies = 0
+            
             try:
+                # Recupera tutte le carte di questo set
+                cursor.execute("""
+                    SELECT id
+                    FROM cards
+                    WHERE set_code = ?
+                """, (set_code,))
+                
+                set_card_ids = set(row[0] for row in cursor.fetchall())
+                
                 # Conta carte possedute in questo set
-                owned_count = sum(1 for card_id, qty in inventory.items() if qty > 0 and cursor.execute(
-                    "SELECT 1 FROM cards WHERE id = ? AND set_code = ?", 
-                    (card_id, set_code)
-                ).fetchone())
+                owned_count = sum(1 for card_id, qty in inventory.items() 
+                                if qty > 0 and card_id in set_card_ids)
                 
-                # Totale copie
-                total_owned_copies = sum(qty for card_id, qty in inventory.items() if cursor.execute(
-                    "SELECT 1 FROM cards WHERE id = ? AND set_code = ?",
-                    (card_id, set_code)
-                ).fetchone())
+                # Totale copie possedute
+                total_owned_copies = sum(qty for card_id, qty in inventory.items() 
+                                    if card_id in set_card_ids)
                 
-            except:
+            except Exception as e:
+                print(f"Error calculating owned cards for {set_code}: {e}")
                 owned_count = 0
                 total_owned_copies = 0
             
@@ -4888,64 +4806,78 @@ class MainWindow(QMainWindow):
             # GRID DELLE CARTE
             # =========================================================================
             
-            # Query per ottenere le carte del set
-            cursor.execute("""
-                SELECT id, card_number, card_name, rarity, local_image_path
-                FROM cards
-                WHERE set_code = ?
-                ORDER BY CAST(card_number AS INTEGER)
-            """, (set_code,))
-            
-            cards = cursor.fetchall()
-            
-            # Recupera wishlist
-            cursor.execute("SELECT card_id FROM wishlist")
-            wishlist_ids = set(row[0] for row in cursor.fetchall())
-            
-            # Container per le carte
-            cards_widget = QWidget()
-            cards_grid = QGridLayout(cards_widget)
-            cards_grid.setSpacing(10)
-            cards_grid.setContentsMargins(10, 10, 10, 10)
-            
-            # Crea widget per ogni carta
-            row, col = 0, 0
-            max_cols = 6
-            
-            for card_id, card_number, card_name, rarity, image_path in cards:
-                try:
-                    quantity = inventory.get(card_id, 0)
-                    is_wishlisted = card_id in wishlist_ids
-                    
-                    card_data = {
-                        'id': card_id,
-                        'card_number': card_number,
-                        'card_name': card_name,
-                        'rarity': rarity,
-                        'local_image_path': image_path,
-                        'set_code': set_code
-                    }
-                    
-                    card_widget = CardWidget(card_data, quantity, is_wishlisted)
-                    card_widget.wishlist_changed.connect(self.on_wishlist_changed)
-                    
-                    cards_grid.addWidget(card_widget, row, col)
-                    
-                    col += 1
-                    if col >= max_cols:
-                        col = 0
-                        row += 1
+            try:
+                # Query per ottenere le carte del set
+                cursor.execute("""
+                    SELECT id, card_number, card_name, rarity, local_image_path
+                    FROM cards
+                    WHERE set_code = ?
+                    ORDER BY CAST(card_number AS INTEGER)
+                """, (set_code,))
+                
+                cards = cursor.fetchall()
+                
+                # Recupera wishlist
+                cursor.execute("SELECT card_id FROM wishlist")
+                wishlist_ids = set(row[0] for row in cursor.fetchall())
+                
+                # Container per le carte
+                cards_widget = QWidget()
+                cards_grid = QGridLayout(cards_widget)
+                cards_grid.setSpacing(10)
+                cards_grid.setContentsMargins(10, 10, 10, 10)
+                
+                # Crea widget per ogni carta
+                row, col = 0, 0
+                max_cols = 6
+                
+                for card_id, card_number, card_name, rarity, image_path in cards:
+                    try:
+                        quantity = inventory.get(card_id, 0)
+                        is_wishlisted = card_id in wishlist_ids
                         
-                except Exception as e:
-                    print(f"Error creating widget for card {card_id}: {e}")
-                    continue
-            
-            content_widget.layout().addWidget(cards_widget)
+                        card_data = {
+                            'id': card_id,
+                            'card_number': card_number,
+                            'card_name': card_name,
+                            'rarity': rarity,
+                            'local_image_path': image_path,
+                            'set_code': set_code
+                        }
+                        
+                        card_widget = CardWidget(card_data, quantity, is_wishlisted)
+                        card_widget.wishlist_changed.connect(self.on_wishlist_changed)
+                        
+                        cards_grid.addWidget(card_widget, row, col)
+                        
+                        col += 1
+                        if col >= max_cols:
+                            col = 0
+                            row += 1
+                            
+                    except Exception as e:
+                        print(f"Error creating widget for card {card_id}: {e}")
+                        continue
+                
+                content_widget.layout().addWidget(cards_widget)
+                
+            except Exception as e:
+                print(f"❌ Error fetching cards for {set_code}: {e}")
+                import traceback
+                traceback.print_exc()
+                
+                error_label = QLabel(f"❌ Error loading cards: {str(e)}")
+                error_label.setStyleSheet("QLabel { color: #e74c3c; padding: 10px; }")
+                content_widget.layout().addWidget(error_label)
             
         except Exception as e:
-            print(f"Error loading cards for set {set_code}: {e}")
+            print(f"❌ Error loading cards for set {set_code}: {e}")
             import traceback
             traceback.print_exc()
+            
+            error_label = QLabel(f"❌ Error loading set data: {str(e)}")
+            error_label.setStyleSheet("QLabel { color: #e74c3c; padding: 10px; }")
+            content_widget.layout().addWidget(error_label)
 
 
     def on_collection_finished(self, total_owned, total_cards):

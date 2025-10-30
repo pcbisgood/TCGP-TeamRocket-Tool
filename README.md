@@ -1,7 +1,7 @@
 # 🎴 TCGP Team Rocket Tool
 
 <div align="center">
-  <img src="gui/icon.png" alt="TCGP Team Rocket Tool Logo" width="150"/>
+  <img src="gui/icon.ico" alt="TCGP Team Rocket Tool Logo" width="150"/>
   
   **Complete TCG Pocket Collection Manager & Discord Bot**
   

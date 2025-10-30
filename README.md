@@ -10,13 +10,13 @@
   [![Discord.py](https://img.shields.io/badge/Discord.py-2.3+-blueviolet.svg)](https://pypi.org/project/discord.py/)
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 </div>
+[![Preview](https://i.ibb.co/JWTZCpkv/image.png)](https://i.ibb.co/JWTZCpkv/image.png)
 
-<p align="center">
-  <a href="https://i.ibb.co/JWTZCpkv/image.png"><img src="https://i.ibb.co/JWTZCpkv/image.png" width="450"></a><br>
-  <a href="https://i.ibb.co/dsmKLr8X/image.png"><img src="https://i.ibb.co/dsmKLr8X/image.png" width="450"></a><br>
-  <a href="https://i.ibb.co/60wQ53z1/image.png"><img src="https://i.ibb.co/60wQ53z1/image.png" width="450"></a><br>
-  <a href="https://i.ibb.co/394ZRTRC/image.png"><img src="https://i.ibb.co/394ZRTRC/image.png" width="450"></a>
-</p>
+[![Preview](https://i.ibb.co/dsmKLr8X/image.png)](https://i.ibb.co/dsmKLr8X/image.png)
+
+[![Preview](https://i.ibb.co/60wQ53z1/image.png)](https://i.ibb.co/60wQ53z1/image.png)
+
+[![Preview](https://i.ibb.co/394ZRTRC/image.png)](https://i.ibb.co/394ZRTRC/image.png)
 
 
 

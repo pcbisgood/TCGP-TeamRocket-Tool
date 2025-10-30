@@ -67,6 +67,42 @@
   },
   {
    "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates;templates/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/account_collection.html;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/base.html;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/card_details.html;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/error.html;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/index.html;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/login.html;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/set_view.html;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/stats.html;."
+  },
+  {
+   "optionDest": "datas",
    "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/background.png;."
   },
   {
@@ -86,8 +122,24 @@
    "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon.png;."
   },
   {
-   "optionDest": "binaries",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/cloudflared.exe;."
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon_temp.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/exe_config.json;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/README.md;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/requirements.txt;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/scanner_settings.json;."
   }
  ],
  "nonPyinstallerOptions": {

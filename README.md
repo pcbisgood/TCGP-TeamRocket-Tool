@@ -11,6 +11,13 @@
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 </div>
 
+[![Preview](https://i.ibb.co/JWTZCpkv/image.png)](https://i.ibb.co/JWTZCpkv/image.png)
+[![Preview](https://i.ibb.co/dsmKLr8X/image.png)](https://i.ibb.co/dsmKLr8X/image.png)
+[![Preview](https://i.ibb.co/60wQ53z1/image.png)](https://i.ibb.co/60wQ53z1/image.png)
+[![Preview](https://i.ibb.co/394ZRTRC/image.png)](https://i.ibb.co/394ZRTRC/image.png)
+
+
+
 ---
 
 ## 🚀 Project Description
@@ -60,7 +67,7 @@ A Discord listener bot monitors the same channel to **track, analyze, and update
 
 ---
 
-### 🪄 Quick Start
+### ⚙️ Quick Start
 
 You can download the **precompiled version** of the tool directly from the following link:  
 👉 [Download TCGP Team Rocket Tool (.exe)](https://example.com/download) *(link coming soon)*  

@@ -4063,9 +4063,11 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.information(self, "Info", "Pack screenshot not found")
 
-
     def send_wishlist_notification(self, card_data):
-        """Invia una notifica quando una carta nella wishlist viene trovata."""
+        """Invia una notifica quando una carta nella wishlist viene trovata.
+        
+        Layout: [Immagine Carta PICCOLA] + Testo + Icona App nel titolo
+        """
         if not WINDOWS_TOAST_AVAILABLE:
             return
         
@@ -4073,43 +4075,61 @@ class MainWindow(QMainWindow):
             card_name = card_data.get('card_name', 'Unknown')
             set_code = card_data.get('set_code', '')
             rarity = card_data.get('rarity', '')
+            card_image = card_data.get('local_image_path')
             
-            toaster = WindowsToaster('TCGP Team Rocket Tool')
-            
-            # ⬇️ MODIFICA QUESTA PARTE ⬇️
+            toaster = WindowsToaster('🎴 TCGP Team Rocket Tool')
             toast = Toast()
+            
+            # ✅ Testo notifica
             toast.text_fields = [
-                'Wishlist Card Found!',
-                f'{card_name} ({set_code})',
-                f'Rarity: {rarity}'
+                '❤️ Wishlist Card Found!',
+                f'{card_name}',
+                f'{set_code} #{card_data.get("card_number", "?")} • {rarity}'
             ]
             
-            # Aggiungi icona dell'app al toast
-            if os.path.exists(ICON_PATH):
-                # Converti .ico in .png per Toast (se necessario)
-                icon_for_toast = ICON_PATH
-                if ICON_PATH.endswith('.ico'):
-                    # Toast supporta PNG, converti se è ICO
-                    try:
-                        from PIL import Image
-                        img = Image.open(ICON_PATH)
-                        temp_png = os.path.join('gui/icon_temp.png')
-                        img.save(temp_png, 'PNG')
-                        icon_for_toast = temp_png
-                    except:
-                        pass
-                
-                toast.AddImage(ToastDisplayImage.fromPath(icon_for_toast, circleCrop=True))
-            
-            # Aggiungi immagine della carta se disponibile
-            card_image = card_data.get('local_image_path')
+            # =====================================================
+            # ✅ IMMAGINE CARTA: Piccola a sinistra (Logo position)
+            # =====================================================
             if card_image and os.path.exists(card_image):
-                toast.AddImage(ToastDisplayImage.fromPath(card_image))
+                try:
+                    image_path = card_image
+                    
+                    # Se è WebP, converti a PNG
+                    if card_image.endswith('.webp'):
+                        from PIL import Image
+                        import tempfile
+                        
+                        temp_png = os.path.join(tempfile.gettempdir(), 'card_notification.png')
+                        
+                        img = Image.open(card_image)
+                        
+                        # Ridimensiona per notifica piccola (80x120 - dimensione toast)
+                        img.thumbnail((80, 120), Image.Resampling.LANCZOS)
+                        
+                        img.save(temp_png, 'PNG')
+                        image_path = temp_png
+                    
+                    # ✅ Aggiungi come immagine PRINCIPALE (sinistra)
+                    # imagePosition=0 = Immagine piccola a sinistra
+                    toast.AddImage(
+                        ToastDisplayImage.fromPath(image_path)
+                    )
+                    
+                except Exception as e:
+                    print(f"⚠️ Error loading card image: {e}")
             
+            # =====================================================
+            # MOSTRA NOTIFICA
+            # =====================================================
             toaster.show_toast(toast)
             
+            print(f"✅ Wishlist notification: {card_name} ({set_code})")
+            
         except Exception as e:
-            print(f"Error sending notification: {e}")
+            print(f"❌ Error sending notification: {e}")
+            import traceback
+            traceback.print_exc()
+
     
     def send_windows_toast(self, card_name, set_code, card_number, card_image_path):
         """Invia notifica Windows toast con windows-toasts (Microsoft ufficiale)."""

@@ -16,8 +16,8 @@
 
 | Feature | Screenshot |
 |---------|-----------|
-| **Main Dashboard** | ![Dashboard](https://imgur.com/JWTZCpk.png) |
-| **Collection Manager** | ![Collection](https://imgur.com/dsmKLr8.png) |
+| **Main Dashboard** | ![Dashboard](https://i.ibb.co/JWTZCpkv/image.png) |
+| **Collection Manager** | ![Collection](https://i.ibb.co/dsmKLr8X/image.png) |
 | **Trade History** | ![Trades](https://imgur.com/60wQ53z.png) |
 | **Mobile WebApp** | ![Mobile](https://imgur.com/394ZRTRC.png) |
 

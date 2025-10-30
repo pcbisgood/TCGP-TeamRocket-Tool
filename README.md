@@ -1,10 +1,10 @@
 # 🎴 TCGP Team Rocket Tool
 
 <div align="center">
-  <img src="gui/icon.ico" alt="TCGP Team Rocket Tool Logo" width="150"/>
-  
+  <img src="gui/icon.png" alt="TCGP Team Rocket Tool Logo" width="150"/>
+
   **Complete TCG Pocket Collection Manager & Discord Bot**
-  
+
   [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
   [![PyQt5](https://img.shields.io/badge/PyQt5-5.15+-green.svg)](https://pypi.org/project/PyQt5/)
   [![Discord.py](https://img.shields.io/badge/Discord.py-2.3+-blueviolet.svg)](https://pypi.org/project/discord.py/)
@@ -15,121 +15,167 @@
 
 ## 🚀 Project Description
 
-The TCGP Team Rocket Tool is a comprehensive application designed for managing your Trading Card Game (TCG) Pocket collection. It consists of a desktop application built with PyQt5 for local collection management and a Discord bot using Discord.py to integrate collection data with your Discord server.
+**TCGP Team Rocket Tool** is a comprehensive application designed to efficiently manage your *Pokémon TCG Pocket* collection.
 
-This tool allows you to:
+It combines:
+- A **desktop application** built with **PyQt5**, for local collection management.
+- A **Discord bot** built with **discord.py**, to sync, track, and share your collection directly within your Discord server.
 
--   Maintain a detailed inventory of your TCG collection.
--   Quickly search and filter cards.
--   Export and import collection data.
--   Integrate with Discord for sharing and trading.
-
----
-
-## ⚙️ Installation
-
-### Prerequisites
-
--   Python 3.8 or higher
--   pip (Python package installer)
-
-### Steps
-
-1.  **Clone the repository:**
-
-    bash
-    python main.py
-    -   **Add Cards:** Manually add cards to your collection with details like set, condition, and quantity.
--   **Search & Filter:** Quickly find cards using various filters.
--   **Export/Import:** Export your collection to a file for backup or import from a file.
-
-### Troubleshooting
-
--   **Application does not start:**
-    -   Ensure all dependencies are installed correctly.
-    -   Check for any error messages in the console.
-    -   Verify that you are using a compatible version of Python.
+### ✨ Key Features
+- Maintain a **detailed inventory** of your TCG collection.
+- **Search and filter** cards instantly.
+- **Export** and **import** your data.
+- **Integrate** with Discord for trading, sharing, and real-time tracking.
+- Access your collection via a built-in **WebApp** (local or Cloudflare-tunneled remote access).
 
 ---
 
-## 🤖 Discord Bot Usage
+## 👨‍💻 Credits
 
-### Setting up the Bot
+- **Created by:** pcb.is.good  
+- **Designed to work alongside:** [Arturo-1212/PTCGPB](https://github.com/Arturo-1212/PTCGPB)
 
-1.  **Create a Discord Bot:**
-    -   Go to the [Discord Developer Portal](https://discord.com/developers/applications).
-    -   Create a new application and then create a bot within that application.
-    -   Note your bot's token.
+### 💝 Special Thanks
+- **Arturo (Bot Creator)** – [Arturo-1212](https://github.com/Arturo-1212)  
+- **GummyBaer** – Feedback + Card & Pack Matching Algorithm  
 
-2.  **Invite the Bot to your Server:**
-    -   Use the OAuth2 URL Generator in the Discord Developer Portal to generate an invite link with the `bot` and `applications.commands` scopes.
-    -   Use the generated link to invite the bot to your server.
-
-3.  **Configure the Bot:**
-    -   Rename the `.env.example` file to `.env`
-    -   Edit the `.env` file and add your bot token and any other required configurations:
-
-        ### Bot Commands
-
-> Update the following commands based on your bot's actual commands.
-
--   `/collection add <card_name> <set_name> <quantity>`: Adds a card to your collection.
--   `/collection remove <card_name> <set_name> <quantity>`: Removes a card from your collection.
--   `/collection view`: Displays your current collection.
-
-### Troubleshooting
-
--   **Bot is not online:**
-    -   Ensure the bot token is correct in the `.env` file.
-    -   Check the console for any error messages.
-    -   Verify that the bot has the necessary permissions in your Discord server.
--   **Commands are not working:**
-    -   Make sure the bot is invited with the `applications.commands` scope.
-    -   Ensure that the bot has the necessary permissions in the channel.
+For any questions, please refer to the **official bot Discord**.
 
 ---
 
-## 🤝 Contributing
+## ⚙️ Overview
 
-We welcome contributions! Here's how you can contribute:
-
-1.  Fork the repository.
-2.  Create a new branch for your feature or bug fix.
-3.  Make your changes and commit them with descriptive commit messages.
-4.  Submit a pull request.
-
-> Please follow these guidelines when contributing:
->
-> -   Write clear and concise code.
-> -   Add comments to explain complex logic.
-> -   Test your changes thoroughly.
+The tool is based on the **S4T (Save for Trade)** function from Arturo’s bot.  
+A Discord listener bot monitors the same channel to **track, analyze, and update** your collection database — both for **past** trades and **live** events.
 
 ---
 
-## 📝 License
+## 🧩 Installation
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### 🧱 Prerequisites
+
+- Python **3.8+**
+- `pip` (Python package manager)
+- A Discord server where you can invite your custom bot
+
+---
+
+### 🪄 Quick Start
+
+You can download the **precompiled version** of the tool directly from the following link:  
+👉 [Download TCGP Team Rocket Tool (.exe)](https://example.com/download) *(link coming soon)*  
+
+After downloading, simply place the executable inside a **dedicated folder** — it will automatically create all necessary subdirectories and configuration files on first launch.  
+
+> ⚠️ It’s important to avoid running the `.exe` from the Desktop or Downloads folder, as it will generate local data files.
+
+---
+
+### 🧰 Alternative Setup (Manual / Development)
+
+If you experience issues with the `.exe` version, you can **clone the repository** and run the tool manually ( _LinkStart.bat ).
+
+
+## 🤖 Discord Bot Setup
+
+### 1. Create a Discord Bot
+- Go to the [Discord Developer Portal](https://discord.com/developers/applications).
+- Create a new **application**, then a **bot** inside it.
+- Copy your **Bot Token** for later use.
+
+### 2. Invite the Bot
+- In the **OAuth2 → URL Generator**, select:
+  - Scopes: `bot`, `applications.commands`
+  - Permissions: `Read Messages/View Channels`
+- Use the generated link to **invite the bot** to your server.
+
+### 3. Configure the App
+1. Launch the tool and open **Settings**.  
+2. Paste your **Bot Token** and **Channel ID**.  
+3. On first launch, the app will:
+   - Create a **local dataset** and **database** for your collection.
+   - Download images and set data from [pocket.limitlesstcg.com](https://pocket.limitlesstcg.com).  
+   - Automatically fetch a proxy list for scraping.
+
+> 🧠 **Tip:** Run a new scraping session whenever a new card set is released.
+
+---
+
+## 🧠 How It Works
+
+1. Press **Start Bot** to begin downloading all messages from the selected Discord channel.  
+   ⏳ *The time required depends on the message count.*
+2. Each message is parsed to detect card data.
+3. Extracted information is displayed in:
+   - The **Collection tab** (desktop)
+   - The **WebApp** (browser)
+
+---
+
+## 🗂️ Collection Management
+
+### 📦 Main Tab
+- Displays a quick summary of analyzed packs.
+- View cards found, including:
+  - The **pack** and **account** associated with each card.
+  - Double-click any image for a larger preview.
+
+### 🃏 Collection Tab
+- Displays all owned cards and quantities.
+- Add cards to a **wishlist** to receive alerts when they appear in packs.
+- Click on a card to:
+  - See all accounts that own it.
+  - Access its **XML file** directly.
+
+---
+
+## 🌐 WebApp Access
+
+You can launch a **WebApp** version of your collection to view it on any device — locally or remotely.
+
+Using **Cloudflare (TryCloudflare)**, you can:
+- Instantly get a **free temporary domain**.
+- Create a **secure tunnel** for external access.
+
+> ⚠️ When accessing from outside your local network, a **password** is required for security.
+
+---
+
+## 🧩 Background Operation
+
+Closing the window via **“X”** keeps the tool running in the background, accessible via the **system tray**.  
+It will continue monitoring Discord activity and updating your collection silently.
 
 ---
 
 ## 🐛 Bug Reports & Feature Requests
 
-Found a bug or have a feature request? Please open an issue on the [GitHub Issues](https://github.com/yourusername/TCGP-TeamRocket-Tool/issues) page.
+Found a bug or have a feature request?  
+Open an issue on the [GitHub Issues](https://github.com/yourusername/TCGP-TeamRocket-Tool/issues) page.
 
-> When reporting bugs, please include:
->
-> -   A clear and descriptive title.
-> -   Steps to reproduce the bug.
-> -   The expected behavior.
-> -   The actual behavior.
-> -   Any relevant error messages or screenshots.
+> Please include:
+> - A clear, descriptive title  
+> - Steps to reproduce  
+> - Expected vs. actual behavior  
+> - Relevant screenshots or error logs  
 
 ---
 
 ## 💬 Community & Support
 
-Join our Discord server for support and discussions:
-
-[![Discord](label=Discord&logo=discord&logoColor=white)](https://discord.gg/Msa5vNjUUf)
+Join our Discord server for updates, discussions, and support:  
+[![Discord](https://img.shields.io/badge/Join%20us%20on%20Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/Msa5vNjUUf)
 
 ---
+
+## 🐍 Technical Notes
+
+- **Language:** Python  
+- **Frameworks:** PyQt5, Discord.py  
+- **Distribution:** Compiled `.exe`  
+- **Scraping Source:** [pocket.limitlesstcg.com](https://pocket.limitlesstcg.com)  
+- **Discord Integration:** Discord API  
+
+---
+
+> 🪶 *Developed by Yomi (aka pcb.is.good) — powered by caffeine, curiosity, and a dash of Team Rocket mischief.*

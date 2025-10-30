@@ -1,6 +1,0 @@
-target:
-  - url: "."
-  
-include: []
-
-reinit: "a-random-string"

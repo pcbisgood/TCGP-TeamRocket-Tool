@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}{{ account_name }}'s Collection{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-person-circle"></i> {{ account_name }}'s Collection</h2>
+        <a href="/" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to All Collections
+        </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-center bg-primary text-white shadow">
+                <div class="card-body">
+                    <h3>{{ stats.unique_cards }}</h3>
+                    <p class="mb-0">Unique Cards</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center bg-success text-white shadow">
+                <div class="card-body">
+                    <h3>{{ stats.total_copies }}</h3>
+                    <p class="mb-0">Total Copies</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center bg-info text-white shadow">
+                <div class="card-body">
+                    <h3>{{ stats.sets_owned }}</h3>
+                    <p class="mb-0">Sets Owned</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Collection by Set (Collapsible with Cover) -->
+    <div class="accordion" id="collectionAccordion">
+        {% for set_code, set_data in collection_by_set.items() %}
+        <div class="card mb-3 shadow-sm">
+            <!-- Collapsible Header with Cover -->
+            <div class="card-header bg-light p-0">
+                <button class="btn btn-link text-decoration-none w-100 text-start d-flex align-items-center collapsed" 
+                        type="button" 
+                        data-bs-toggle="collapse" 
+                        data-bs-target="#collapse-{{ set_code }}"
+                        aria-expanded="false"
+                        aria-controls="collapse-{{ set_code }}">
+                    
+                    <!-- Cover Image -->
+                    <div class="set-cover-wrapper me-3">
+                        <img src="/tcg_images/{{ set_code }}/cover.png" 
+                             alt="{{ set_data.set_name }}" 
+                             class="set-cover-profile"
+                             onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22168%22%3E%3Crect fill=%22%23ddd%22 width=%22120%22 height=%22168%22/%3E%3C/svg%3E'">
+                    </div>
+                    
+                    <!-- Set Info -->
+                    <div class="flex-grow-1">
+                        <h5 class="mb-1 text-dark">{{ set_data.set_name }} ({{ set_code }})</h5>
+                        <small class="text-muted">{{ set_data.cards|length }} cards owned</small>
+                    </div>
+                    
+                    <!-- Arrow Icon -->
+                    <i class="bi bi-chevron-down ms-auto me-3 text-dark"></i>
+                </button>
+            </div>
+
+            <!-- Collapsible Body -->
+            <div id="collapse-{{ set_code }}" 
+                 class="collapse" 
+                 data-bs-parent="#collectionAccordion">
+                <div class="card-body">
+                    <div class="row">
+                        {% for card in set_data.cards %}
+                        <div class="col-lg-2 col-md-3 col-sm-4 col-6 mb-3">
+                            <a href="/card/{{ card[0] }}" class="text-decoration-none">
+                                <div class="card h-100 card-hover">
+                                    <img src="/tcg_images/{{ set_code }}/{{ set_code }}_{{ '%03d' % (card[1]|int) }}.webp" 
+                                         class="card-img-top" 
+                                         alt="{{ card[2] }}"
+                                         onerror="
+                                         if(!this.hasAttribute('data-fallback-1')){
+                                             this.setAttribute('data-fallback-1', 'true');
+                                             this.src='/tcg_images/{{ set_code }}/{{ set_code }}_{{ card[1] }}.webp';
+                                         } else {
+                                             this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22280%22%3E%3Crect fill=%22%23333%22 width=%22200%22 height=%22280%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 font-size=%2216%22 fill=%22white%22 text-anchor=%22middle%22 dy=%22.3em%22%3E?%3C/text%3E%3C/svg%3E';
+                                         }">
+                                    <div class="card-body p-2 text-center">
+                                        <small class="d-block text-truncate" title="{{ card[2] }}">{{ card[2] }}</small>
+                                        <div class="mt-1">
+                                            <span class="badge bg-primary">{{ card[4] }}x</span>
+                                            <span class="badge bg-warning text-dark">{{ card[3] }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not collection_by_set %}
+    <div class="alert alert-info text-center">
+        <i class="bi bi-inbox"></i> This account has no cards yet.
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* Wrapper per cover - Maggiore e ben visibile */
+.set-cover-wrapper {
+    flex-shrink: 0;
+    width: 120px;
+    height: 168px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f5f5f5;
+    border-radius: 5px;
+    border: 2px solid #ddd;
+    overflow: hidden;
+}
+
+/* Cover del set - GRANDE e CONTENUTA */
+.set-cover-profile {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Card Hover Effect */
+.card-hover {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.card-hover img {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    background-color: #f0f0f0;
+    min-height: 280px;
+}
+
+/* Collapse Button Styling */
+.card-header button.btn-link {
+    padding: 15px;
+}
+
+.card-header button.btn-link:hover {
+    background-color: #f8f9fa;
+}
+
+/* Freccia che ruota */
+.card-header button.collapsed i.bi-chevron-down {
+    transform: rotate(0deg);
+    transition: transform 0.3s;
+}
+
+.card-header button:not(.collapsed) i.bi-chevron-down {
+    transform: rotate(180deg);
+    transition: transform 0.3s;
+}
+
+.text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+</style>
+
+<!-- Bootstrap 5 JS (per collapse) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

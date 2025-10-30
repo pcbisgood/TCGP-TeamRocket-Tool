@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}{{ card.card_name }} - Card Details{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- Card Image - GRANDE -->
+        <div class="col-md-5">
+            <div class="card shadow-sm card-image-container">
+                <img src="/tcg_images/{{ card.set_code }}/{{ card.set_code }}_{{ '%03d' % (card.card_number|int) }}.webp" 
+                     class="card-img-top card-detail-image" 
+                     alt="{{ card.card_name }}"
+                     onerror="
+                     if(!this.hasAttribute('data-fallback-1')){
+                         this.setAttribute('data-fallback-1', 'true');
+                         this.src='/tcg_images/{{ card.set_code }}/{{ card.set_code }}_{{ card.card_number }}.webp';
+                     } else {
+                         this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22390%22%3E%3Crect fill=%22%23333%22 width=%22280%22 height=%22390%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 font-size=%2220%22 fill=%22white%22 text-anchor=%22middle%22 dy=%22.3em%22%3ECard Image Not Found%3C/text%3E%3C/svg%3E';
+                     }">
+            </div>
+        </div>
+
+        <!-- Card Info -->
+        <div class="col-md-7">
+            <h2 class="mb-3">{{ card.card_name }}</h2>
+            <p class="text-muted mb-4" style="font-size: 18px;">{{ card.set_code }} #{{ card.card_number }}</p>
+            
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Card Information</h5>
+                    <hr>
+                    <div class="row">
+                        <div class="col-6">
+                            <p><strong>Set:</strong> {{ card.set_code }}</p>
+                        </div>
+                        <div class="col-6">
+                            <p><strong>Card Number:</strong> {{ card.card_number }}</p>
+                        </div>
+                        <div class="col-12">
+                            <p><strong>Rarity:</strong> <span class="badge bg-warning text-dark" style="font-size: 14px;">{{ card.rarity }}</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ownership List -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-people-fill"></i> Owned By</h5>
+                </div>
+                <div class="card-body">
+                    {% if owners %}
+                    <div class="list-group list-group-flush">
+                        {% for owner in owners %}
+                        <a href="/account/{{ owner.account_name }}" 
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="bi bi-person-circle"></i> {{ owner.account_name }}
+                            </span>
+                            <span class="badge bg-primary rounded-pill">{{ owner.quantity }} copies</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center mb-0">
+                        <i class="bi bi-inbox"></i> No one owns this card yet.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 mb-4">
+        <a href="/" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Collection
+        </a>
+    </div>
+</div>
+
+<style>
+/* Container per immagine carta */
+.card-image-container {
+    overflow: hidden;
+}
+
+/* Immagine carta GRANDE - SENZA ridimensionamento */
+.card-detail-image {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    background-color: #f0f0f0;
+    min-height: 400px;
+}
+
+/* Link hover */
+.list-group-item:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.2s;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,97 @@
+{
+ "version": "auto-py-to-exe-configuration_v1",
+ "pyinstallerOptions": [
+  {
+   "optionDest": "noconfirm",
+   "value": true
+  },
+  {
+   "optionDest": "filenames",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/discord_bot.py"
+  },
+  {
+   "optionDest": "onefile",
+   "value": true
+  },
+  {
+   "optionDest": "console",
+   "value": false
+  },
+  {
+   "optionDest": "icon_file",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon.ico"
+  },
+  {
+   "optionDest": "name",
+   "value": "TCGP Team Rocket Tool"
+  },
+  {
+   "optionDest": "clean_build",
+   "value": false
+  },
+  {
+   "optionDest": "splash",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon.png"
+  },
+  {
+   "optionDest": "strip",
+   "value": false
+  },
+  {
+   "optionDest": "noupx",
+   "value": false
+  },
+  {
+   "optionDest": "disable_windowed_traceback",
+   "value": false
+  },
+  {
+   "optionDest": "uac_admin",
+   "value": false
+  },
+  {
+   "optionDest": "uac_uiaccess",
+   "value": false
+  },
+  {
+   "optionDest": "argv_emulation",
+   "value": false
+  },
+  {
+   "optionDest": "bootloader_ignore_signals",
+   "value": false
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui;gui/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/background.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/background_with_overlay.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/background2.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon.ico;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon.png;."
+  },
+  {
+   "optionDest": "binaries",
+   "value": "C:/Users/Yomi/Desktop/pkmn - discord/cloudflared.exe;."
+  }
+ ],
+ "nonPyinstallerOptions": {
+  "increaseRecursionLimit": true,
+  "manualArguments": ""
+ }
+}

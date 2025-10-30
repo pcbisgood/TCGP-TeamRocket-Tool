@@ -1,0 +1,12 @@
+{
+  "database": "tcg_pocket.db",
+  "accounts_dir": "Accounts",
+  "threshold": 0.6,
+  "workers": 4,
+  "rarities": [
+    "\u25ca\u25ca\u25ca\u25ca",
+    "\u2606",
+    "\u2606\u2606",
+    "Crown Rare"
+  ]
+}

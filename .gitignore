@@ -1,0 +1,97 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+tcg_pocket.db
+
+# Images & Media
+tcg_images/
+screenshots/
+*.jpg
+*.png
+*.webp
+*.gif
+!gui/icon.ico
+!gui/icon.png
+!gui/background.png
+
+# Logs
+*.log
+logs/
+
+# Config files con dati sensibili e user data
+config.json
+config.yml
+bot_token.txt
+.env
+settings.json
+trade_log.json
+
+Accounts/
+*.xml
+
+# Generated images
+Images/
+*.png
+
+# Cloudflared (scaricato automaticamente dall'app)
+cloudflared.exe
+
+# Output folder (eseguibili compilati)
+output/
+*.exe
+!setup.exe
+
+
+output/
+cloudflared*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Proxy files
+proxies.txt
+
+# Temp files
+*.tmp
+*.bak
+background_with_overlay.png

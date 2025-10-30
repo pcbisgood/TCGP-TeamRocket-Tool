@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Statistiche - TCG Pocket Collection{% endblock %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h1 class="display-5 fw-bold mb-3">
+        <i class="bi bi-graph-up"></i> Statistiche Collezione
+    </h1>
+    <p class="lead text-light">Panoramica completa della tua collezione</p>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card-custom p-4">
+            <h4 class="mb-4"><i class="bi bi-trophy-fill"></i> Top 5 Account</h4>
+            
+            {% if top_accounts %}
+            <div class="list-group list-group-flush bg-transparent">
+                {% for account in top_accounts %}
+                <div class="list-group-item bg-transparent text-light border-secondary d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ account.account_name }}</strong>
+                        <br>
+                        <small class="text-muted">
+                            {{ account.unique_cards }} carte diverse
+                        </small>
+                    </div>
+                    <span class="badge rounded-pill" 
+                          style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); font-size: 1.1rem;">
+                        {{ account.total_copies }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted text-center py-4">Nessun dato disponibile</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card-custom p-4">
+            <h4 class="mb-4"><i class="bi bi-star-fill"></i> Carte Più Possedute</h4>
+            
+            {% if top_cards %}
+            <div class="list-group list-group-flush bg-transparent">
+                {% for card in top_cards %}
+                <div class="list-group-item bg-transparent text-light border-secondary d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ card.card_name }}</strong>
+                        <br>
+                        <small class="text-muted">
+                            {{ card.set_code }}-{{ card.card_number }}
+                            {% if card.rarity == '◊◊◊◊' %}
+                            <span class="rarity-badge rarity-4diamond">◊◊◊◊</span>
+                            {% elif card.rarity == '☆' %}
+                            <span class="rarity-badge rarity-star">☆</span>
+                            {% elif card.rarity == '☆☆' %}
+                            <span class="rarity-badge rarity-star2">☆☆</span>
+                            {% elif card.rarity == 'Crown Rare' %}
+                            <span class="rarity-badge rarity-crown">Crown</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                    <span class="badge rounded-pill" 
+                          style="background: linear-gradient(135deg, #ff6b6b, #ff8e53); font-size: 1.1rem;">
+                        {{ card.total_copies }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted text-center py-4">Nessun dato disponibile</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card-custom p-4">
+    <h4 class="mb-4"><i class="bi bi-gem"></i> Statistiche per Rarità</h4>
+    
+    {% if rarity_stats %}
+    <div class="row g-3">
+        {% for stat in rarity_stats %}
+        <div class="col-md-6 col-lg-3">
+            <div class="stat-card">
+                <div class="mb-2">
+                    {% if stat.rarity == '◊◊◊◊' %}
+                    <span class="rarity-badge rarity-4diamond">◊◊◊◊</span>
+                    {% elif stat.rarity == '☆' %}
+                    <span class="rarity-badge rarity-star">☆</span>
+                    {% elif stat.rarity == '☆☆' %}
+                    <span class="rarity-badge rarity-star2">☆☆</span>
+                    {% elif stat.rarity == 'Crown Rare' %}
+                    <span class="rarity-badge rarity-crown">Crown Rare</span>
+                    {% endif %}
+                </div>
+                <div class="stat-number">{{ stat.total_copies }}</div>
+                <small class="text-muted">{{ stat.unique_cards }} carte diverse</small>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted text-center py-4">Nessun dato disponibile</p>
+    {% endif %}
+</div>
+{% endblock %}

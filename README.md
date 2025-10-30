@@ -71,7 +71,7 @@ A Discord listener bot monitors the same channel to **track, analyze, and update
 ### ⚙️ Quick Start
 
 You can download the **precompiled version** of the tool directly from the following link:  
-👉 [Download TCGP Team Rocket Tool (.exe)](https://www.mediafire.com/file/0myyp073a2pdfnv/TCGP_Team_Rocket_Tool.exe/file)
+👉 [Download TCGP Team Rocket Tool (.exe)](https://www.mediafire.com/file/6j0f953peujo03g/TCGP_Team_Rocket_Tool.exe/file)
 👉 [VirusTotal TCGP Team Rocket Tool (.exe)](https://www.virustotal.com/gui/file/038ef053b38bdb99f59e3ee26d689599a67ae1cddb073e248b9ae5b60296f6d2/detection)
 After downloading, simply place the executable inside a **dedicated folder** — it will automatically create all necessary subdirectories and configuration files on first launch.  
 

@@ -805,7 +805,7 @@ class TCGPocketScraper:
         # Setup database
         try:
             self.db_manager.setup_database()
-            os.makedirs('tcg_images', exist_ok=True)
+            os.makedirs(TCG_IMAGES_DIR, exist_ok=True)
             proxy_msg = f"✅ Caricati {len(self.proxies)} proxy" if self.use_proxy else "⚠️ Scraping senza proxy"
             self.log_callback(proxy_msg)
         except Exception as e:
@@ -1210,7 +1210,7 @@ class TCGPocketScraper:
     def process_set(self, set_data, download_images=True):
         """Processa un intero set CON PARALLELIZZAZIONE e salvataggio."""
         set_code = set_data['code']
-        set_folder = os.path.join('tcg_images', set_code)
+        set_folder = os.path.join(TCG_IMAGES_DIR, set_code)
         os.makedirs(set_folder, exist_ok=True)
         
         self.log_callback(f"📦 Processing set: {set_code} - {set_data['name']}")

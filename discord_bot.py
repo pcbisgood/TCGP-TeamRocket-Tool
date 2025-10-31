@@ -64,14 +64,42 @@ except ImportError:
 
 
 
+def get_resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller."""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
+
+def get_app_data_path(filename):
+    """Get path in user's AppData for persistent storage."""
+    app_data_dir = os.path.join(os.getenv('APPDATA'), 'TCGPTeamRocketTool')
+    os.makedirs(app_data_dir, exist_ok=True)
+    return os.path.join(app_data_dir, filename)
+
+# ============================================================================
+# PATHS - USE THESE FUNCTIONS
+# ============================================================================
+
+# Static resources (bundled with EXE)
+ICON_PATH = get_resource_path("gui/icon.ico")
+BACKGROUND_PATH = get_resource_path("gui/background.png")
+CLOUDFLARED_PATH = get_app_data_path("cloudflared.exe")
+
 # =========================================================================
 # 🎯 GLOBAL CONFIGURATION
 # =========================================================================
 
 # Discord Bot Configuration
-SEARCH_STRING = "<@1207666049412239434>"
+SEARCH_STRING = "Tradeable cards"
 LOG_FILENAME = 'trade_log.json'
-ACCOUNTS_DIR = 'Accounts'
+ACCOUNTS_DIR = get_app_data_path("Accounts")
+TCG_IMAGES_DIR = get_app_data_path("tcg_images")
+os.makedirs(ACCOUNTS_DIR, exist_ok=True)
+os.makedirs(TCG_IMAGES_DIR, exist_ok=True)
 ACCOUNT_NAME_REGEX = r'by\s+(.*?)\s+in instance:'
 BATCH_SIZE = 500
 CHUNK_SIZE = 1024 * 128
@@ -80,12 +108,11 @@ RETRY_DELAY = 1
 MAX_CONCURRENT_DOWNLOADS = 20
 SAVE_INTERVAL = 100
 ACCOUNT_NAME_PATTERN = re.compile(ACCOUNT_NAME_REGEX)
-ICON_PATH = 'gui/icon.ico'
 CLOUDFLARE_PASSWORD = os.getenv('CLOUDFLARE_PASSWORD', '')
 
 # Database Configuration
-DB_FILENAME = 'tcg_pocket.db'
-
+DB_FILENAME = get_app_data_path("tcg_pocket.db")
+PROXIES_FILE = get_app_data_path("proxies.txt")
 # Card Scanner Configuration (OpenCV Template Matching)
 TEMPLATE_DOWNSCALE_FACTOR = 0.20
 SIMILARITY_THRESHOLD = 0.65
@@ -3716,31 +3743,56 @@ class MainWindow(QMainWindow):
         self.activateWindow()
     
     def quit_application(self):
-        """✅ SEMPLIFICATO - Chiude l'applicazione."""
+        """✅ CORRETTO - Chiude l'applicazione in modo sicuro."""
         try:
-            print("🛑 Shutting down...")
+            print("🛑 Shutting down application...")
             
-            # Prova a fermare il bot in vari modi
+            # Ferma il bot Discord se è in esecuzione
             if hasattr(self, 'bot_thread') and self.bot_thread:
-                # Metodo 1: Usa stop_bot se esiste
-                if hasattr(self.bot_thread, 'stop_bot'):
-                    self.bot_thread.stop_bot()
-                
-                # Metodo 2: Imposta running a False
-                if hasattr(self.bot_thread, 'running'):
-                    self.bot_thread.running = False
-                
-                # Aspetta che il thread termini
-                self.bot_thread.join(timeout=2)
+                try:
+                    if hasattr(self.bot_thread, 'stop_bot'):
+                        self.bot_thread.stop_bot()
+                    self.bot_thread.join(timeout=2)
+                    print("✅ Discord bot stopped")
+                except Exception as e:
+                    print(f"⚠️ Error stopping bot: {e}")
+            
+            # Ferma Flask se è in esecuzione
+            if hasattr(self, 'flask_thread') and self.flask_thread:
+                try:
+                    if hasattr(self.flask_thread, 'stop_server'):
+                        self.flask_thread.stop_server()
+                    self.flask_thread.join(timeout=2)
+                    print("✅ Flask server stopped")
+                except Exception as e:
+                    print(f"⚠️ Error stopping Flask: {e}")
             
             # Chiudi il database
             if hasattr(self, 'db_manager') and self.db_manager:
-                self.db_manager.close()
+                try:
+                    self.db_manager.close()
+                    print("✅ Database closed")
+                except Exception as e:
+                    print(f"⚠️ Error closing database: {e}")
             
+            # Chiudi Cloudflare tunnel se attivo
+            if hasattr(self, 'cloudflare_process') and self.cloudflare_process:
+                try:
+                    self.cloudflare_process.terminate()
+                    self.cloudflare_process.wait(timeout=2)
+                    print("✅ Cloudflare tunnel closed")
+                except Exception as e:
+                    print(f"⚠️ Error closing Cloudflare: {e}")
+            
+            # Chiudi l'applicazione PyQt
             QApplication.quit()
+            print("✅ Application closed")
             
         except Exception as e:
-            print(f"❌ Shutdown error: {e}")
+            print(f"❌ Error during shutdown: {e}")
+            import traceback
+            traceback.print_exc()
+            # Force quit comunque
             QApplication.quit()
 
 

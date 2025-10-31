@@ -47,6 +47,8 @@ from urllib.parse import urljoin
 
 # Flask
 from flask import request, session, render_template
+from flask import Flask, send_file
+import mimetypes
 
 # Image Processing
 import cv2
@@ -1192,7 +1194,12 @@ class TCGPocketScraper:
             card['rarity'] = rarity
             
             if download_images and card['image_url']:
-                filename = f"{set_code}_{card['card_number'].zfill(3)}.webp"
+                # ❌ VECCHIO (zfill aggiunge padding)
+                # filename = f"{set_code}_{card['card_number'].zfill(3)}.webp"
+                
+                # ✅ NUOVO (senza padding)
+                filename = f"{set_code}_{card['card_number']}.webp"
+                
                 save_path = os.path.join(set_folder, filename)
                 card['local_image_path'] = save_path
                 
@@ -2427,6 +2434,136 @@ class FlaskServerThread(QThread):
             self.flask_app = app
             
             # ===== ROUTES  ====
+            @app.route('/tcg_images/<path:image_path>')
+            def serve_tcg_images(image_path):
+                """Serve immagini TCG - funziona con EXE."""
+                try:
+                    import urllib.parse
+                    
+                    # Decodifica il path
+                    decoded_path = urllib.parse.unquote(image_path)
+                    
+                    # Costruisci path completo
+                    full_path = os.path.join(TCG_IMAGES_DIR, decoded_path)
+                    
+                    # Normalizza il path (rimuovi .. e simili)
+                    full_path = os.path.abspath(full_path)
+                    base_dir = os.path.abspath(TCG_IMAGES_DIR)
+                    
+                    # Verifica che il file sia dentro TCG_IMAGES_DIR (security check)
+                    if not full_path.startswith(base_dir):
+                        return "Access denied", 403
+                    
+                    print(f"📁 Requested: {decoded_path}")
+                    print(f"📁 Full path: {full_path}")
+                    print(f"✅ Exists: {os.path.exists(full_path)}")
+                    
+                    if not os.path.exists(full_path):
+                        return "Not found", 404
+                    
+                    # Determina il tipo MIME
+                    mimetype, _ = mimetypes.guess_type(full_path)
+                    if mimetype is None:
+                        mimetype = 'image/webp'
+                    
+                    print(f"✅ Sending: {mimetype}")
+                    return send_file(full_path, mimetype=mimetype)
+                    
+                except Exception as e:
+                    print(f"❌ Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    return f"Error: {str(e)}", 500
+                
+            @app.route('/debug/images')
+            def debug_images():
+                """Debug: mostra il percorso delle immagini."""
+                import os
+                
+                html = f"""
+                <h1>Debug Images</h1>
+                <p><strong>TCG_IMAGES_DIR:</strong> {TCG_IMAGES_DIR}</p>
+                <p><strong>Exists:</strong> {os.path.exists(TCG_IMAGES_DIR)}</p>
+                <hr>
+                <h2>Available images:</h2>
+                <ul>
+                """
+                
+                if os.path.exists(TCG_IMAGES_DIR):
+                    for root, dirs, files in os.walk(TCG_IMAGES_DIR):
+                        for file in files:
+                            if file.endswith(('.webp', '.png', '.jpg')):
+                                full_path = os.path.join(root, file)
+                                rel_path = os.path.relpath(full_path, TCG_IMAGES_DIR)
+                                
+                                # Converti backslash a forward slash
+                                url_path = rel_path.replace('\\', '/')
+                                
+                                html += f"""
+                                <li>
+                                    <strong>{file}</strong><br>
+                                    Full: {full_path}<br>
+                                    Rel: {rel_path}<br>
+                                    URL: <a href="/tcg_images/{url_path}">Test</a>
+                                </li>
+                                """
+                
+                html += "</ul>"
+                return html
+
+            @app.route('/set/<set_code>')
+            def view_set(set_code):
+                """Mostra le carte di un set."""
+                try:
+                    # Recupera il set dal database
+                    conn = sqlite3.connect(DB_FILENAME)
+                    cursor = conn.cursor()
+                    
+                    cursor.execute("SELECT set_code, set_name, release_date, total_cards FROM sets WHERE set_code = ?", (set_code,))
+                    set_row = cursor.fetchone()
+                    
+                    if not set_row:
+                        return render_template('error.html', error="Set not found"), 404
+                    
+                    set_code, set_name, release_date, total_cards = set_row
+                    
+                    # Recupera le carte del set
+                    cursor.execute("""
+                        SELECT set_code, card_number, card_name, rarity, local_image_path
+                        FROM cards 
+                        WHERE set_code = ?
+                        ORDER BY CAST(card_number AS INTEGER)
+                    """, (set_code,))
+                    
+                    cards = []
+                    for row in cursor.fetchall():
+                        cards.append({
+                            'set_code': row[0],
+                            'card_number': row[1],
+                            'card_name': row[2],
+                            'rarity': row[3],
+                            'local_image_path': row[4]
+                        })
+                    
+                    # Recupera il path della cover
+                    cursor.execute("SELECT cover_image_path FROM sets WHERE set_code = ?", (set_code,))
+                    cover_result = cursor.fetchone()
+                    cover_path = cover_result[0] if cover_result else None
+                    
+                    return render_template('set_view.html',
+                        set_code=set_code,
+                        set_name=set_name,
+                        release_date=release_date,
+                        total_cards=total_cards,
+                        cover_path=cover_path,
+                        cards=cards
+                    )
+                
+                except Exception as e:
+                    print(f"❌ Error: {e}")
+                    return render_template('error.html', error=str(e)), 500
+
+
 
             @app.route('/account/<account_name>', methods=['GET', 'POST'])
             @require_password

@@ -3,119 +3,143 @@
 {% block title %}{{ set_name }} - Collection{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <!-- Header compatto con Cover Piccola -->
-    <div class="d-flex align-items-start mb-4 gap-3">
-        <!-- Cover Piccola -->
-        <div class="set-cover-header-container">
+<div class="set-view">
+    <!-- ? DEBUG - Mostra i dati ricevuti -->
+    <div style="background: #333; padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 12px; color: #aaa;">
+        <p><strong>DEBUG:</strong></p>
+        <p>set_code: {{ set_code }}</p>
+        <p>set_name: {{ set_name }}</p>
+        <p>cards count: {{ cards|length }}</p>
+        <p>cover_path: {{ cover_path }}</p>
+    </div>
+
+    <div class="set-header">
+        <!-- ? COVER IMAGE -->
+        {% if cover_path %}
             <img src="/tcg_images/{{ set_code }}/cover.png" 
-                 alt="{{ set_name }}" 
-                 class="set-cover-header"
-                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22140%22%3E%3Crect fill=%22%23ddd%22 width=%22100%22 height=%22140%22/%3E%3C/svg%3E'">
-        </div>
-        
-        <!-- Testo Info - CON text-white -->
-        <div>
-            <h2 class="mb-2 text-white">{{ set_name }}</h2>
-            <p class="mb-1 text-white">
-                <strong>{{ set_code }}</strong>
-            </p>
-            <p class="mb-1 text-white">
-                Released: {{ release_date }}
-            </p>
-            <p class="mb-3 text-white">
-                Target Cards: {{ total_cards }}
-            </p>
-            
-            <a href="/" class="btn btn-sm btn-secondary">
-                <i class="bi bi-arrow-left"></i> Back
-            </a>
-        </div>
-    </div>
-
-    <hr>
-
-    <!-- Cards Grid -->
-    <h5 class="mb-3 text-white">Cards in {{ set_name }}</h5>
-    <div class="row">
-        {% if cards and cards|length > 0 %}
-            {% for card in cards %}
-            <div class="col-lg-2 col-md-3 col-sm-4 col-6 mb-3">
-                <a href="/card/{{ card[0] }}" class="text-decoration-none">
-                    <div class="card h-100 card-hover">
-                        <img src="/tcg_images/{{ set_code }}/{{ set_code }}_{{ '%03d' % (card[1]|int) }}.webp" 
-                             class="card-img-top card-grid-image" 
-                             alt="{{ card[2] }}"
-                             onerror="
-                             if(!this.hasAttribute('data-fallback-1')){
-                                 this.setAttribute('data-fallback-1', 'true');
-                                 this.src='/tcg_images/{{ set_code }}/{{ set_code }}_{{ card[1] }}.webp';
-                             } else {
-                                 this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22280%22%3E%3Crect fill=%22%23333%22 width=%22200%22 height=%22280%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 font-size=%2216%22 fill=%22white%22 text-anchor=%22middle%22 dy=%22.3em%22%3E?%3C/text%3E%3C/svg%3E';
-                             }">
-                        <div class="card-body p-2 text-center">
-                            <small class="d-block text-truncate" title="{{ card[2] }}">{{ card[2] }}</small>
-                            <div class="mt-1">
-                                <span class="badge bg-warning text-dark">{{ card[3] }}</span>
-                                {% if card[4] > 0 %}
-                                <span class="badge bg-primary">{{ card[4] }}x</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            {% endfor %}
+                 alt="{{ set_name }} Cover" 
+                 class="set-cover">
         {% else %}
-        <div class="alert alert-warning w-100">
-            ⚠️ No cards found in this set.
-        </div>
+            <p style="color: #888;">No cover image</p>
         {% endif %}
+
+        <div class="set-info">
+            <h1>{{ set_code }} - {{ set_name }}</h1>
+            <p><strong>Released:</strong> {{ release_date }}</p>
+            <p><strong>Total Cards:</strong> {{ total_cards }}</p>
+        </div>
     </div>
+
+    <!-- CARDS GRID -->
+    <div class="cards-grid">
+        {% for card in cards %}
+        <div class="card-item">
+            <!-- ? DEBUG: Mostra l'URL dell'immagine -->
+            <img src="/tcg_images/{{ set_code }}/{{ card.set_code }}_{{ card.card_number }}.webp" 
+                 alt="{{ card.card_name }}"
+                 class="card-image"
+                 loading="lazy"
+                 title="{{ card.set_code }}_{{ card.card_number }}.webp"
+                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22150%22 height=%22210%22%3E%3Crect fill=%22%23222%22 width=%22150%22 height=%22210%22/%3E%3Ctext x=%2275%22 y=%22105%22 text-anchor=%22middle%22 fill=%22%23888%22%3E%F0%9F%93%B7%3C/text%3E%3C/svg%3E'">
+            
+            <div class="card-info">
+                <p class="card-name">{{ card.card_name }}</p>
+                <p class="card-rarity">{{ card.rarity }}</p>
+                {% if card.quantity %}
+                    <p class="card-quantity">x{{ card.quantity }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not cards %}
+    <div class="empty-state">
+        <p>No cards found in this set.</p>
+    </div>
+    {% endif %}
 </div>
 
 <style>
-/* Cover Header Container */
-.set-cover-header-container {
-    flex-shrink: 0;
-    width: 100px;
+.set-view {
+    padding: 20px;
 }
 
-/* Cover Header - PICCOLA e NON SCALATA */
-.set-cover-header {
-    width: 100px;
-    height: 140px;
-    object-fit: contain;
-    border: 2px solid #ddd;
-    border-radius: 5px;
-    background-color: #f5f5f5;
+.set-header {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 40px;
+    align-items: flex-start;
 }
 
-/* Immagine carte nella griglia */
-.card-grid-image {
+.set-cover {
+    width: 200px;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.set-info h1 {
+    margin: 0 0 15px 0;
+}
+
+.set-info p {
+    margin: 5px 0;
+    color: #ccc;
+}
+
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.card-item {
+    background: #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s;
+}
+
+.card-item:hover {
+    transform: scale(1.05);
+}
+
+.card-image {
     width: 100%;
     height: auto;
-    object-fit: contain;
-    background-color: #f0f0f0;
-    min-height: 280px;
+    display: block;
+    background: #222;
+    min-height: 200px;
 }
 
-/* Card Hover Effect */
-.card-hover {
-    transition: transform 0.2s, box-shadow 0.2s;
+.card-info {
+    padding: 10px;
+    text-align: center;
 }
 
-.card-hover:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+.card-name {
+    font-weight: bold;
+    margin: 5px 0;
+    font-size: 12px;
 }
 
-.text-truncate {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.card-rarity {
+    color: #ffd700;
+    font-size: 11px;
+    margin: 3px 0;
+}
+
+.card-quantity {
+    color: #00ff00;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #888;
 }
 </style>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 {% endblock %}

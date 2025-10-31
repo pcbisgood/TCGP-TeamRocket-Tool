@@ -2515,10 +2515,10 @@ class FlaskServerThread(QThread):
             def view_set(set_code):
                 """Mostra le carte di un set."""
                 try:
-                    # Recupera il set dal database
                     conn = sqlite3.connect(DB_FILENAME)
                     cursor = conn.cursor()
                     
+                    # Recupera il set dal database
                     cursor.execute("SELECT set_code, set_name, release_date, total_cards FROM sets WHERE set_code = ?", (set_code,))
                     set_row = cursor.fetchone()
                     
@@ -2527,13 +2527,13 @@ class FlaskServerThread(QThread):
                     
                     set_code, set_name, release_date, total_cards = set_row
                     
-                    # Recupera le carte del set
+                    # ✅ IMPORTANTE: Filtra SOLO le carte di questo set
                     cursor.execute("""
-                        SELECT set_code, card_number, card_name, rarity, local_image_path
+                        SELECT set_code, card_number, card_name, rarity
                         FROM cards 
                         WHERE set_code = ?
                         ORDER BY CAST(card_number AS INTEGER)
-                    """, (set_code,))
+                    """, (set_code,))  # ← Passa set_code come parametro
                     
                     cards = []
                     for row in cursor.fetchall():
@@ -2541,8 +2541,7 @@ class FlaskServerThread(QThread):
                             'set_code': row[0],
                             'card_number': row[1],
                             'card_name': row[2],
-                            'rarity': row[3],
-                            'local_image_path': row[4]
+                            'rarity': row[3]
                         })
                     
                     # Recupera il path della cover
@@ -2561,6 +2560,8 @@ class FlaskServerThread(QThread):
                 
                 except Exception as e:
                     print(f"❌ Error: {e}")
+                    import traceback
+                    traceback.print_exc()
                     return render_template('error.html', error=str(e)), 500
 
 

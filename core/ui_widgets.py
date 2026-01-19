@@ -22,7 +22,8 @@ import sqlite3
 import sys
 import subprocess
 from typing import Optional, Dict
-
+import json               # <-- Aggiungi
+from pathlib import Path  # <-- Aggiungi
 # Import configurazione
 from config import get_resource_path, TCG_IMAGES_DIR, DB_FILENAME, ACCOUNTS_DIR, RARITY_DATA
 
@@ -43,7 +44,8 @@ import os
 import sqlite3
 from typing import Optional, Dict
 
-
+import tempfile
+from .ui_dialogs import InjectAccountDialog, SimpleSelectionDialog
 # =========================================================================
 # 🎴 CARD WIDGET - Widget per mostrare una carta nella collezione
 # =========================================================================
@@ -81,7 +83,7 @@ class CardWidget(QWidget):
         self.image_loaded = False  # Flag per lazy loading
         
         # Placeholder iniziale
-        self.image_label.setText("🎴")
+        self.image_label.setText(t("card.placeholder"))
         
         image_layout.addWidget(self.image_label)
         
@@ -98,7 +100,7 @@ class CardWidget(QWidget):
         main_layout.addWidget(image_container)
         
         # Label per il numero della carta (larghezza fissa uguale all'immagine)
-        card_num_label = QLabel(f"#{card_data['card_number']}")
+        card_num_label = QLabel(t("card.number_label", number=card_data['card_number']))
         card_num_label.setFixedWidth(120)
         card_num_label.setAlignment(Qt.AlignCenter)
         card_num_label.setStyleSheet("QLabel { font-size: 9px; color: #888; }")
@@ -128,7 +130,7 @@ class CardWidget(QWidget):
                     background-color: rgba(231, 76, 60, 255);
                 }
             """)
-            self.wishlist_btn.setText("❤️")
+            self.wishlist_btn.setText(t("wishlist.hearted"))
         else:
             self.wishlist_btn.setStyleSheet("""
                 QPushButton {
@@ -141,7 +143,7 @@ class CardWidget(QWidget):
                     background-color: rgba(231, 76, 60, 150);
                 }
             """)
-            self.wishlist_btn.setText("🤍")
+            self.wishlist_btn.setText(t("wishlist.unhearted"))
     
     def toggle_wishlist(self):
         """Toggle dello stato wishlist."""
@@ -176,12 +178,12 @@ class CardWidget(QWidget):
                     if self.quantity > 0:
                         self.add_quantity_badge()
                 else:
-                    self.image_label.setText("❌")
+                    self.image_label.setText(t("card.error_icon"))
             except Exception as e:
-                self.image_label.setText("❌")
-                print(f"Error loading image {image_path}: {e}")
+                self.image_label.setText(t("card.error_icon"))
+                print(t("card.error_loading_image", path=image_path, error=str(e)))
         else:
-            self.image_label.setText("🎴")
+            self.image_label.setText(t("card.placeholder"))
     
     def add_quantity_badge(self):
         """Aggiunge un badge con il numero di copie possedute."""
@@ -328,9 +330,9 @@ class CardDetailsDialog(QDialog):
                 scaled_pixmap = pixmap.scaled(300, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.image_label.setPixmap(scaled_pixmap)
             else:
-                self.image_label.setText("❌ " + t("card_details.image_not_found"))
+                self.image_label.setText(t("card.error_icon") + " " + t("card_details.image_not_found"))
         else:
-            self.image_label.setText("🎴 " + t("card_details.no_image"))
+            self.image_label.setText(t("card.placeholder") + " " + t("card_details.no_image"))
     
     def load_ownership_data(self):
         """Carica i dati di ownership dal database."""
@@ -374,7 +376,7 @@ class CardDetailsDialog(QDialog):
                     self.ownership_table.setCellWidget(row_idx, 2, action_widget)
         
         except Exception as e:
-            print(f"Error loading ownership data: {e}")
+            print(t("card_details.error_loading_ownership", error=str(e)))
             QMessageBox.warning(self, t("ui.error"), t("card_details_ui.failed_load_ownership") + f": {str(e)}")
     
     def get_total_stats(self):
@@ -395,7 +397,7 @@ class CardDetailsDialog(QDialog):
                 
                 return total_copies, total_accounts
         except Exception as e:
-            print(f"Error getting stats: {e}")
+            print(t("card_details.error_getting_stats", error=str(e)))
             return 0, 0
     
     def open_card_folder(self):
@@ -465,12 +467,12 @@ class ImageViewerDialog(QDialog):
             )
             self.image_label.setPixmap(scaled_pixmap)
         else:
-            self.image_label.setText("❌ " + t("card_details.cannot_load_image"))
+            self.image_label.setText(t("card.error_icon") + " " + t("card_details.cannot_load_image"))
         
         layout.addWidget(self.image_label)
         
         # Info label
-        info_label = QLabel(f"📁 {os.path.dirname(image_path)}\n📄 {os.path.basename(image_path)}")
+        info_label = QLabel(t("card_details.info_label", folder=os.path.dirname(image_path), file=os.path.basename(image_path)))
         info_label.setStyleSheet("QLabel { color: #888; font-size: 10px; padding: 5px; }")
         layout.addWidget(info_label)
         
@@ -515,6 +517,7 @@ class CollectionCardDialog(QDialog):
         
         self.card_id = card_id
         self.db_manager = db_manager
+        self.parent_tab = parent
         
         # 1. Recupera i dati completi della carta
         self.card_data = self.fetch_card_data()
@@ -523,7 +526,7 @@ class CollectionCardDialog(QDialog):
             return
 
         # 2. Impostazioni della finestra
-        self.setWindowTitle(self.card_data['card_name'])
+        self.setWindowTitle(t("collection_card_dialog.title", name=self.card_data['card_name']))
         self.setMinimumSize(600, 450)
 
         # 3. Layout principale (Orizzontale)
@@ -536,35 +539,145 @@ class CollectionCardDialog(QDialog):
         main_layout.addWidget(details_panel, 2) # 2/3 dello spazio (priorità alla tabella)
         main_layout.addWidget(image_panel, 1)   # 1/3 dello spazio (l'immagine si adatterà)
 
+    def _get_mumu_instances(self, mumu_player_path: str) -> Dict[str, str]:
+        """
+        Legge i file vm_config.json (per la porta) e 
+        extra_config.json (per playerName) di MuMu.
+        
+        Args:
+            mumu_player_path: Il percorso DIRETTO alla cartella
+                              (es. "C:\\Program Files\\Netease\\MuMuPlayerGlobal-12.0")
+        
+        Restituisce un dizionario es: {"1": "16416", "2": "16417"}
+        """
+        instances_map = {}
+        vms_path_found = Path(mumu_player_path) / "vms"
+        
+        if not vms_path_found.exists():
+            print(t("mumu.error_vms_not_found", path=str(vms_path_found)))
+            return {}
+
+        print(t("mumu.scan_instances", path=str(vms_path_found)))
+
+        for vm_folder in vms_path_found.iterdir():
+            if not vm_folder.is_dir() or vm_folder.name.endswith("-base"):
+                continue
+            
+            print(t("mumu.found_instance_folder", name=vm_folder.name))
+            
+            config_dir = vm_folder / "configs"
+            vm_config_path = config_dir / "vm_config.json"
+            extra_config_path = config_dir / "extra_config.json"
+
+            if not vm_config_path.exists():
+                print(t("mumu.warning_vm_config_not_found", dir=str(config_dir)))
+                continue
+
+            port = None
+            name = None
+
+            try:
+                # 1. Leggi la porta da vm_config.json
+                with open(vm_config_path, 'r', encoding='utf-8') as f:
+                    vm_config_data = json.load(f)
+                
+                try:
+                    # ================================================================
+                    # ✅ CORREZIONE: Aggiunto ['vm'] all'inizio del percorso
+                    # ================================================================
+                    port = vm_config_data['vm']['nat']['port_forward']['adb']['host_port']
+                
+                except KeyError:
+                    print(t("mumu.error_adb_port_not_found", file=vm_config_path.name))
+                    continue # Salta questa istanza
+
+                # 2. Leggi il nome da extra_config.json (se esiste)
+                if extra_config_path.exists():
+                    with open(extra_config_path, 'r', encoding='utf-8') as f:
+                        extra_config_data = json.load(f)
+                        name = extra_config_data.get('playerName')
+                        print(t("mumu.found_player_name", name=name))
+                else:
+                    print(t("mumu.warning_extra_config_not_found"))
+
+                # 3. Fallback se 'playerName' non è trovato
+                if not name:
+                    name = vm_folder.name # Fallback finale al nome cartella
+                
+                print(t("mumu.instance_uses_port", name=name, port=port))
+                instances_map[name] = str(port)
+                        
+            except Exception as e:
+                print(t("mumu.error_reading_json", name=vm_folder.name, error=str(e)))
+                continue
+                
+            if not instances_map:
+                print(t("mumu.warning_no_valid_instance_found"))
+        
+        return instances_map
+
+
+    def _run_adb_devices(self, adb_path: str) -> set:
+        """
+        Esegue 'adb devices' e restituisce un set di porte connesse.
+        Es: {'127.0.0.1:16384', '127.0.0.1:16385'}
+        """
+        connected_ports = set()
+        try:
+            command = [adb_path, "devices"]
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding='utf-8',
+                timeout=5 # 5 sec timeout
+            )
+            
+            lines = result.stdout.strip().splitlines()
+            for line in lines:
+                if line.strip().endswith("device"):
+                    device_id = line.split()[0]
+                    if device_id.startswith("127.0.0.1:"):
+                        connected_ports.add(device_id)
+                        
+        except FileNotFoundError:
+            QMessageBox.warning(self, t("adb.error_title"), t("adb.command_not_found", path=adb_path))
+        except subprocess.TimeoutExpired:
+            QMessageBox.warning(self, t("adb.error_title"), t("adb.timeout"))
+        except Exception as e:
+            QMessageBox.warning(self, t("adb.error_title"), t("adb.scan_error", error=str(e)))
+            
+        return connected_ports
 
 # Aggiungi questi due metodi a CollectionCardDialog
     
-    def _handle_quantity_change(self, row_index: int, account_id: int, amount_change: int):
-        """Gestisce il click sui pulsanti + e -."""
-        try:
-            # 1. Leggi il valore ATTUALE dalla tabella
-            qty_item = self.owner_table.item(row_index, 1)
-            current_qty = int(qty_item.text())
-            new_qty = current_qty + amount_change
-            
-            # 2. Aggiorna il Database
-            success = self.db_manager.set_inventory_quantity(account_id, self.card_id, new_qty)
-            
-            if not success:
-                QMessageBox.warning(self, "Errore", "Impossibile aggiornare il database.")
-                return
-
-            # 3. Aggiorna la UI
-            if new_qty <= 0:
-                # Rimuovi la riga dalla tabella
-                self.owner_table.removeRow(row_index)
-            else:
-                # Aggiorna il numero nella tabella
-                qty_item.setText(str(new_qty))
-                
-        except Exception as e:
-            print(f"❌ Errore _handle_quantity_change: {e}")
-            QMessageBox.warning(self, "Errore", f"Errore: {e}")
+#   def _handle_quantity_change(self, row_index: int, account_id: int, amount_change: int):
+#       """Gestisce il click sui pulsanti + e -."""
+#       try:
+#           # 1. Leggi il valore ATTUALE dalla tabella
+#           qty_item = self.owner_table.item(row_index, 1)
+#           current_qty = int(qty_item.text())
+#           new_qty = current_qty + amount_change
+#           
+#           # 2. Aggiorna il Database
+#           success = self.db_manager.set_inventory_quantity(account_id, self.card_id, new_qty)
+#           
+#           if not success:
+#               QMessageBox.warning(self, "Errore", "Impossibile aggiornare il database.")
+#               return
+#
+#           # 3. Aggiorna la UI
+#           if new_qty <= 0:
+#               # Rimuovi la riga dalla tabella
+#               self.owner_table.removeRow(row_index)
+#           else:
+#               # Aggiorna il numero nella tabella
+#               qty_item.setText(str(new_qty))
+#               
+#       except Exception as e:
+#           print(f"❌ Errore _handle_quantity_change: {e}")
+#           QMessageBox.warning(self, "Errore", f"Errore: {e}")
 
     def _handle_xml_export(self, device_account: str, device_password: str, account_name: str):
         """Genera il file XML e chiede all'utente dove salvarlo."""
@@ -598,13 +711,117 @@ class CollectionCardDialog(QDialog):
             except Exception as e:
                 QMessageBox.critical(self, "Errore Salvataggio", f"Impossibile salvare il file:\n{e}")
 
+
+    def _handle_account_inject(self, device_account: str, device_password: str, account_name: str, account_id: int):
+        """
+        Scansiona istanze, chiede di scegliere, e apre il dialog di iniezione
+        passando tutti i dati necessari per il trade.
+        """
+        if not device_account or not device_password:
+            QMessageBox.warning(self, "Dati Mancanti",
+                f"Le credenziali 'deviceAccount' o 'devicePassword' non sono impostate per l'account '{account_name}'.")
+            return
+
+        # ================================================================
+        # 1. RECUPERA INFO (Percorsi locali)
+        # ================================================================
+        try:
+            adb_path_str = "C:\\Program Files\\Netease\\MuMuPlayerGlobal-12.0\\shell\\adb.exe"
+            adb_path_obj = Path(adb_path_str)
+            if not adb_path_obj.exists():
+                QMessageBox.warning(self, "Errore Percorso", f"Percorso ADB non trovato:\n{adb_path_str}")
+                return
+            
+            adb_path = str(adb_path_obj)
+            mumu_player_path = str(adb_path_obj.parent.parent) 
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Errore Interno", f"Impossibile definire i percorsi ADB/MuMu: {e}")
+            return
+
+        # ================================================================
+        # 2. SCANSIONA ISTANZE CONFIGURATE E ATTIVE
+        # ================================================================
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        configured_instances = self._get_mumu_instances(mumu_player_path) 
+        connected_device_ids = self._run_adb_devices(adb_path)
+        QApplication.restoreOverrideCursor()
+        
+        active_ports_set = {dev_id.split(":")[-1] for dev_id in connected_device_ids}
+
+        if not configured_instances:
+            QMessageBox.warning(self, "Errore Configurazione",
+                f"Nessuna istanza MuMu trovata leggendo i file in:\n{mumu_player_path}\\vms")
+            return
+
+        # ================================================================
+        # 3. CHIEDI ALL'UTENTE QUALE USARE
+        # ================================================================
+        selected_port = SimpleSelectionDialog.get_selected_port(
+            configured_instances, 
+            active_ports_set, 
+            self
+        )
+        
+        if not selected_port:
+            return # L'utente ha premuto "Annulla"
+
+        # =GA-DA TROVA IL NOME DELL'ISTANZA DALLA PORTA
+        selected_name = None
+        for name, port in configured_instances.items():
+            if port == selected_port:
+                selected_name = name
+                break
+        
+        if not selected_name:
+             QMessageBox.warning(self, "Errore", "Impossibile trovare il nome per la porta selezionata.")
+             return
+
+        # ================================================================
+        # 4. CREA XML E AVVIA IL WORKER
+        # ================================================================
+        xml_content = (
+            "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n"
+            "<map>\n"
+            f'    <string name="deviceAccount">{device_account}</string>\n'
+            f'    <string name="devicePassword">{device_password}</string>\n'
+            "</map>"
+        )
+        
+        temp_xml_path = ""
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.xml', mode='w', encoding='utf-8') as temp_file:
+                temp_file.write(xml_content)
+                temp_xml_path = temp_file.name
+            
+            # ✅ PASSA TUTTE LE INFORMAZIONI AL DIALOGO
+            inject_dialog = InjectAccountDialog(
+                account_name=account_name, 
+                temp_xml_path=temp_xml_path,
+                adb_path=adb_path,
+                selected_port=selected_port, 
+                card_id=self.card_id,        # <- Per il log DB
+                account_id=account_id,       # <- Per il log DB
+                parent=self
+            )
+            inject_dialog.exec_()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Errore Creazione File Temporaneo", f"Impossibile creare il file XML temporaneo:\n{e}")
+            if temp_xml_path and os.path.exists(temp_xml_path):
+                try:
+                    os.remove(temp_xml_path)
+                except:
+                    pass
+
     def fetch_card_data(self):
         """
         Esegue query al DB per i dettagli completi, l'elenco dei proprietari
         E la copertina del set.
+        ✅ CORRETTO: Usa device_account come ID per la SELECT e la JOIN.
         """
         try:
-            # Query 1: Dettagli della Carta (con BLOB e COPERTINA SET)
+            # Query 1: Dettagli della Carta (invariato)
             query_details = """
                 SELECT 
                     c.card_name, s.set_name, c.set_code, 
@@ -627,16 +844,20 @@ class CollectionCardDialog(QDialog):
                 'card_number': result[3],
                 'rarity': result[4],
                 'thumbnail_blob': result[5],
-                'cover_image_path': result[6] # <-- Aggiunto
+                'cover_image_path': result[6]
             }
             
-            # Query 2: Elenco Proprietari
+            # Query 2: Elenco Proprietari (CRUCIALE)
             query_owners = """
                 SELECT 
-                    a.account_id, a.account_name, ai.quantity,
-                    a.device_account, a.device_password
+                    a.device_account AS account_id,  -- ✅ SELECT: Seleziona la PK device_account e la aliasa
+                    a.account_name, 
+                    ai.quantity,
+                    a.device_account,                -- ✅ device_account (per esportazione)
+                    a.device_password
                 FROM account_inventory ai
-                JOIN accounts a ON ai.account_id = a.account_id
+                -- ✅ JOIN: Unisce su account_id (inventario) = device_account (account)
+                JOIN accounts a ON ai.account_id = a.device_account 
                 WHERE ai.card_id = ? AND ai.quantity > 0
                 ORDER BY ai.quantity DESC, a.account_name ASC
             """
@@ -668,7 +889,7 @@ class CollectionCardDialog(QDialog):
         layout.addWidget(title_label)
 
         # ================================================================
-        # 1. MODIFICA: Cover del Set (con download)
+        # 1. Cover del Set (con download)
         # ================================================================
         set_cover_label = QLabel()
         set_cover_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -708,7 +929,7 @@ class CollectionCardDialog(QDialog):
         layout.addWidget(set_cover_label)
 
         # --- Numero e Rarità ---
-        number_label = QLabel(f"Numero: #{self.card_data['card_number']}")
+        number_label = QLabel(t("collection_card_dialog.number_label", number=self.card_data['card_number']))
         number_label.setStyleSheet("font-size: 14px; color: #E0E0E0;")
         layout.addWidget(number_label)
 
@@ -745,12 +966,12 @@ class CollectionCardDialog(QDialog):
         owner_header_layout = QHBoxLayout(owner_header)
         owner_header_layout.setContentsMargins(0, 5, 0, 5)
         
-        owner_title = QLabel("Posseduto da:")
+        owner_title = QLabel(t("collection_card_dialog.owned_by"))
         owner_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #E0E0E0;")
         owner_header_layout.addWidget(owner_title)
-        
+
         if owners:
-            copies_badge = QLabel(f"{total_copies} {'copia' if total_copies == 1 else 'copie'}")
+            copies_badge = QLabel(t("collection_card_dialog.copies_badge", count=total_copies))
             copies_badge.setStyleSheet("""
                 background-color: #2E5A44;
                 color: #FFFFFF;
@@ -775,7 +996,7 @@ class CollectionCardDialog(QDialog):
             """)
             not_owned_layout = QVBoxLayout(not_owned_container)
             
-            not_owned_label = QLabel("📭 Non posseduta da nessun account")
+            not_owned_label = QLabel(t("collection_card_dialog.not_owned"))
             not_owned_label.setStyleSheet("font-size: 14px; color: #888; font-style: italic;")
             not_owned_label.setAlignment(Qt.AlignCenter)
             not_owned_layout.addWidget(not_owned_label)
@@ -851,7 +1072,7 @@ class CollectionCardDialog(QDialog):
                 qty_layout.setContentsMargins(0, 0, 0, 0)
                 qty_layout.setSpacing(5)
                 
-                qty_badge = QLabel(f"🃏 {quantity}")
+                qty_badge = QLabel(t("collection_card_dialog.qty_badge", quantity=quantity))
                 qty_badge.setStyleSheet("""
                     background-color: #314C6B;
                     color: #FFFFFF;
@@ -890,8 +1111,8 @@ class CollectionCardDialog(QDialog):
                         background-color: #4A2A2A;
                     }
                 """)
-                minus_btn.setToolTip("Rimuovi una copia")
-                minus_btn.clicked.connect(lambda _, a_id=account_id: self._handle_quantity_change_by_id(a_id, -1))
+                minus_btn.setToolTip(t("collection_card_dialog.tooltip_remove_copy"))
+                minus_btn.clicked.connect(lambda _, a_id=account_id: self._handle_quantity_change(a_id, -1))
                 
                 # Bottone Aggiungi
                 plus_btn = QPushButton("+")
@@ -913,11 +1134,10 @@ class CollectionCardDialog(QDialog):
                         background-color: #244A34;
                     }
                 """)
-                plus_btn.setToolTip("Aggiungi una copia")
-                plus_btn.clicked.connect(lambda _, a_id=account_id: self._handle_quantity_change_by_id(a_id, +1))
+                plus_btn.setToolTip(t("collection_card_dialog.tooltip_add_copy"))
+                plus_btn.clicked.connect(lambda _, a_id=account_id: self._handle_quantity_change(a_id, +1))
                 
                 # Bottone XML
-    # Bottone XML (Invariato)
                 xml_btn = QPushButton()
                 xml_btn.setFixedSize(36, 36) 
                 xml_icon = self.style().standardIcon(QStyle.SP_DialogSaveButton) 
@@ -939,13 +1159,43 @@ class CollectionCardDialog(QDialog):
                             background-color: #243A5A;
                         }
                     """)
-                xml_btn.setToolTip("Esporta credenziali XML")
+                xml_btn.setToolTip(t("collection_card_dialog.tooltip_export_xml"))
                 xml_btn.clicked.connect(lambda _, da=device_account, dp=device_password, an=account_name: 
                                         self._handle_xml_export(da, dp, an))                
+                
+                # Bottone Upload
+                upload_btn = QPushButton()
+                upload_btn.setFixedSize(36, 36)
+                upload_icon = self.style().standardIcon(QStyle.SP_ArrowUp) 
+                upload_btn.setIcon(upload_icon)
+                upload_btn.setIconSize(QSize(20, 20))
+                upload_btn.setStyleSheet("""
+                        QPushButton {
+                            font-size: 16px;
+                            background-color: #5A3A5A; /* Colore viola/magenta */
+                            border: 2px solid #AA44AA;
+                            border-radius: 18px;
+                            color: #FFFFFF;
+                        }
+                        QPushButton:hover {
+                            background-color: #6B456B;
+                            border: 2px solid #C055C0;
+                        }
+                        QPushButton:pressed {
+                            background-color: #4A2A4A;
+                        }
+                    """)
+                upload_btn.setToolTip(t("collection_card_dialog.tooltip_inject_account"))
+                upload_btn.clicked.connect(lambda _, da=device_account, dp=device_password, an=account_name, acc_id=account_id: 
+                                        self._handle_account_inject(da, dp, an, acc_id))
+
+                # Aggiungi i bottoni al layout delle azioni
                 actions_layout.addWidget(minus_btn)
                 actions_layout.addWidget(plus_btn)
                 actions_layout.addWidget(xml_btn)
+                actions_layout.addWidget(upload_btn)
                 
+                # Aggiungi il layout delle azioni al layout della card
                 card_layout.addLayout(actions_layout)
                 
                 scroll_layout.addWidget(account_card)
@@ -957,15 +1207,86 @@ class CollectionCardDialog(QDialog):
         layout.addStretch()
         return panel
 
-    def _handle_quantity_change_by_id(self, account_id: int, delta: int):
-        """Gestisce il cambio di quantità dato l'account_id."""
-        # Trova l'indice nella lista owners
-        owners = self.card_data.get('owners', [])
-        for idx, owner_data in enumerate(owners):
-            if owner_data[0] == account_id:
-                self._handle_quantity_change(idx, account_id, delta)
-                break
+ #   def _handle_quantity_change_by_id(self, account_id: int, delta: int):
+ #       """Gestisce il cambio di quantità dato l'account_id."""
+ #       # Trova l'indice nella lista owners
+ #       owners = self.card_data.get('owners', [])
+ #       for idx, owner_data in enumerate(owners):
+ #           if owner_data[0] == account_id:
+ #               self._handle_quantity_change(idx, account_id, delta)
+ #               break
 
+
+    def clear_layout(self, layout):
+        """Helper per pulire un layout prima di ricostruirlo."""
+        if layout is not None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
+                else:
+                    self.clear_layout(item.layout())
+
+    def _handle_quantity_change(self, account_id: int, amount_change: int):
+        """
+        Gestisce il click sui pulsanti + e -.
+        Questa versione aggiorna il DB e poi RICARICA l'intero dialog.
+        È la soluzione più semplice e robusta per aggiornare la UI.
+        """
+        try:
+            # 1. Trova la quantità corrente dai dati in memoria
+            current_qty = 0
+            owner_data = None
+            for data in self.card_data.get('owners', []):
+                if data[0] == account_id: # data[0] è account_id
+                    owner_data = data
+                    current_qty = data[2] # data[2] è quantity
+                    break
+            
+            if owner_data is None:
+                QMessageBox.warning(self, "Errore", "Impossibile trovare l'account nei dati.")
+                return
+
+            new_qty = current_qty + amount_change
+
+            # 2. Aggiorna il Database
+            # (Assicurati che il tuo db_manager abbia questo metodo)
+            try:
+                # Assumiamo che db_manager.set_inventory_quantity esista
+                # e che il tuo db_manager gestisca commit/connessione.
+                # Se il tuo db_manager è quello che ho scritto ieri,
+                # questa chiamata è corretta.
+                self.db_manager.set_inventory_quantity(account_id, self.card_id, new_qty)
+            except Exception as db_e:
+                QMessageBox.warning(self, "Errore Database", f"Impossibile aggiornare il database: {db_e}")
+                return
+
+            # 3. Aggiorna la UI (La via più semplice: ricarica i dati)
+            
+            print(f"Aggiornato: Account {account_id}, Carta {self.card_id}, Nuova Qta: {new_qty}")
+            
+            # Ricarica i dati dal DB
+            self.card_data = self.fetch_card_data()
+            if not self.card_data:
+                self.close() # La carta non è più posseduta? Chiudi
+                return
+
+            # Pulisci e ricostruisci i pannelli
+            self.clear_layout(self.layout()) # Rimuovi tutto
+            
+            # Ricostruisci
+            details_panel = self.create_details_panel()
+            image_panel = self.create_image_panel()
+            
+            self.layout().addWidget(details_panel, 2)
+            self.layout().addWidget(image_panel, 1)
+
+        except Exception as e:
+            print(f"❌ Errore _handle_quantity_change: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.warning(self, "Errore", f"Errore: {e}")
 
 #    def create_details_panel(self) -> QWidget:
 #        """Crea il pannello di sinistra con i dettagli testuali."""

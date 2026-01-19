@@ -7,7 +7,7 @@
   },
   {
    "optionDest": "filenames",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/discord_bot.py"
+   "value": "D:/pkmn - discord/Beta_v1.48/main.py"
   },
   {
    "optionDest": "onefile",
@@ -19,19 +19,15 @@
   },
   {
    "optionDest": "icon_file",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon.ico"
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/icon.ico"
   },
   {
    "optionDest": "name",
-   "value": "TCGP Team Rocket Tool"
+   "value": "Team Rocket Tool 1.48"
   },
   {
    "optionDest": "clean_build",
    "value": false
-  },
-  {
-   "optionDest": "splash",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon.png"
   },
   {
    "optionDest": "strip",
@@ -63,83 +59,239 @@
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui;gui/"
+   "value": "D:/pkmn - discord/Beta_v1.48/gui;gui/"
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates;templates/"
+   "value": "D:/pkmn - discord/Beta_v1.48/core/locales;locales/"
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/account_collection.html;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/templates;templates/"
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/base.html;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core;core/"
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/card_details.html;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/locales/en.json;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/error.html;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/locales/fr.json;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/index.html;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/locales/it.json;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/login.html;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/templates/account_collection.html;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/set_view.html;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/templates/base.html;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/templates/stats.html;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/templates/card_details.html;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/background.png;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/templates/error.html;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/background_with_overlay.png;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/templates/index.html;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/background2.png;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/templates/login.html;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon.ico;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/templates/set_view.html;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon.png;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/templates/stats.html;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/gui/icon_temp.png;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/accounts_tab.py;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/exe_config.json;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/card_recognizer.py;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/README.md;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/cards_found_tab.py;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/requirements.txt;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/cloudflare.py;."
   },
   {
    "optionDest": "datas",
-   "value": "C:/Users/Yomi/Desktop/pkmn - discord/scanner_settings.json;."
+   "value": "D:/pkmn - discord/Beta_v1.48/core/collection_tab.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/color_hash.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/database.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/detect_layout.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/discord_client.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/flask_server.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/image_cache.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/notification_manager.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/scraper.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/scraper_tab.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/stats_endpoints.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/sync_shiny_dust.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/threads.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/thumbnail_generator.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/translations.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/ui_dialogs.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/ui_main_window.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/ui_widgets.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/utils.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/core/wishlist_manager.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/config.py;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/background.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/background_with_overlay.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/hourglass.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/icon.ico;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/shiny_dust.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/rarity_icon;rarity_icon/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/crown.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/diamond_1.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/diamond_2.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/diamond_3.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/diamond_4.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/rainbow_star.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/shiny_1.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/shiny_2.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/star_1.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/star_2.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/gui/star_3.png;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "D:/pkmn - discord/Beta_v1.48/cloudflared.exe;."
+  },
+  {
+   "optionDest": "binaries",
+   "value": "D:/pkmn - discord/Beta_v1.48/cloudflared.exe;."
   }
  ],
  "nonPyinstallerOptions": {

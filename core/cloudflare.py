@@ -1,26 +1,21 @@
-# =========================================================================
-# ?? CLOUDFLARE TUNNEL THREAD
-# =========================================================================
-"""cloudflare.py - Gestione Cloudflare Tunnel"""
+"""cloudflare.py - Gestione Cloudflare Tunnel FIXED"""
 
-# Import standard library
 import subprocess
 import os
 import sys
 from threading import Thread, Event
 from typing import Optional
 
-# Import PyQt5
 from PyQt5.QtCore import QThread, pyqtSignal
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QTextEdit
 
 # Import configurazione
-from config import CLOUDFLARED_PATH, get_app_data_path, CLOUDFLARE_PASSWORD
-
+from config import CLOUDFLARED_PATH, get_app_data_path
+# ❌ NON SOVRASCRIVERE: from config import CLOUDFLARE_PASSWORD
+from PyQt5.QtCore import Qt
 # Import traduzioni
 from .translations import t
 
-CLOUDFLARE_PASSWORD = ""
 
 # =========================================================================
 # 🌐 CLOUDFLARE TUNNEL THREAD
@@ -30,7 +25,7 @@ class CloudflareTunnelThread(QThread):
     """Thread per eseguire Cloudflare Tunnel e ottenere URL pubblico."""
     
     log_signal = pyqtSignal(str)
-    url_ready_signal = pyqtSignal(str)  # Quando l'URL è pronto
+    url_ready_signal = pyqtSignal(str)
     stopped_signal = pyqtSignal()
     error_signal = pyqtSignal(str)
     
@@ -43,7 +38,7 @@ class CloudflareTunnelThread(QThread):
     def run(self):
         """Avvia cloudflared tunnel."""
         try:
-            # Path di cloudflared.exe
+            # ✅ FIX: Path di cloudflared.exe migliorato
             if getattr(sys, 'frozen', False):
                 # Se è in EXE
                 cloudflared_path = os.path.join(sys._MEIPASS, 'cloudflared.exe')
@@ -53,14 +48,14 @@ class CloudflareTunnelThread(QThread):
             
             if not os.path.exists(cloudflared_path):
                 self.error_signal.emit(
-                    f"cloudflared.exe not found at: {cloudflared_path}\n"
+                    f"❌ cloudflared.exe not found at: {cloudflared_path}\n"
                     "Download from: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/"
                 )
                 return
             
             self.log_signal.emit(f"🌐 Starting Cloudflare Tunnel on port {self.local_port}...")
             
-            # Esegui cloudflared
+            # ✅ Esegui cloudflared
             self.process = subprocess.Popen(
                 [cloudflared_path, 'tunnel', '--url', f'http://localhost:{self.local_port}'],
                 stdout=subprocess.PIPE,
@@ -70,11 +65,11 @@ class CloudflareTunnelThread(QThread):
                 universal_newlines=True
             )
             
-            # Leggi output per catturare URL
+            # ✅ Leggi output per catturare URL
             for line in self.process.stdout:
                 self.log_signal.emit(f"Cloudflare: {line.strip()}")
                 
-                # Cerca l'URL pubblico (formato: https://xxxxx.trycloudflare.com)
+                # Cerca l'URL pubblico
                 if 'trycloudflare.com' in line:
                     import re
                     match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', line)
@@ -85,7 +80,7 @@ class CloudflareTunnelThread(QThread):
             
         except Exception as e:
             import traceback
-            self.error_signal.emit(f"Cloudflare Tunnel error: {str(e)}\n{traceback.format_exc()}")
+            self.error_signal.emit(f"❌ Cloudflare Tunnel error: {str(e)}\n{traceback.format_exc()}")
         finally:
             self.stopped_signal.emit()
     
@@ -94,19 +89,17 @@ class CloudflareTunnelThread(QThread):
         if self.process:
             self.log_signal.emit("🛑 Stopping Cloudflare Tunnel...")
             self.process.terminate()
-            self.process.wait(timeout=5)
+            try:
+                self.process.wait(timeout=5)
+            except:
+                self.process.kill()
             self.process = None
         self.quit()
 
-# =========================================================================
-# 🌐 FLASK WEB SERVER THREAD
-# =========================================================================
 
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QTextEdit, 
-                             QPushButton, QMessageBox)
-from PyQt5.QtCore import Qt
-from pathlib import Path
-import os
+# =========================================================================
+# 🔐 CLOUDFLARE PASSWORD DIALOG
+# =========================================================================
 
 class CloudflarePasswordDialog(QDialog):
     """Dialog per configurare password Cloudflare"""
@@ -129,9 +122,14 @@ class CloudflarePasswordDialog(QDialog):
         layout.addWidget(title)
         
         # Info
-        info = QLabel("This password will protect your access when sharing via Cloudflare.\n"
-                    "No password is needed locally.")
+        info = QLabel(
+            "⚠️ IMPORTANTE:\n\n"
+            "• Accesso LOCALE (localhost): NON richiede password\n"
+            "• Accesso PUBBLICO (Cloudflare): RICHIEDE password\n\n"
+            "La password proteggerà l'accesso quando condividi via Cloudflare."
+        )
         info.setStyleSheet("color: #aaa; margin-bottom: 15px;")
+        info.setWordWrap(True)
         layout.addWidget(info)
         
         # Textarea
@@ -151,7 +149,7 @@ class CloudflarePasswordDialog(QDialog):
         layout.addWidget(QLabel(t("cloudflare.password")))
         layout.addWidget(self.password_input)
         
-        # Status (se esiste già)
+        # Status
         self.status_label = QLabel()
         self.status_label.setStyleSheet("color: #888; font-size: 11px; margin-top: 10px;")
         self.check_existing_password()
@@ -197,21 +195,31 @@ class CloudflarePasswordDialog(QDialog):
         
         layout.addLayout(button_layout)
         
+        # Info finale
+        info2 = QLabel("💡 Tip: Salva questa password in un posto sicuro!")
+        info2.setStyleSheet("color: #7f8c8d; font-size: 12px; margin-top: 10px;")
+        info2.setWordWrap(True)
+        info2.setAlignment(Qt.AlignCenter)
+        layout.addWidget(info2)
+        
         self.setLayout(layout)
     
     def check_existing_password(self):
         """Controlla se esiste una password nel .env"""
+        from pathlib import Path
         env_file = Path('.env')
         if env_file.exists():
             try:
                 with open(env_file, 'r') as f:
                     for line in f:
                         if line.startswith('CLOUDFLARE_PASSWORD='):
-                            self.status_label.setText(t("cloudflare.password_already_set"))
-                            return
+                            password_value = line.split('=', 1)[1].strip()
+                            if password_value:
+                                self.status_label.setText("✅ " + t("cloudflare.password_already_set"))
+                                return
             except:
                 pass
-        self.status_label.setText(t("cloudflare.no_password_set"))
+        self.status_label.setText("⚠️ " + t("cloudflare.no_password_set"))
     
     def save_password(self):
         """Salva la password nel .env"""
@@ -227,6 +235,8 @@ class CloudflarePasswordDialog(QDialog):
             return
         
         try:
+            from pathlib import Path
+            
             # Scrivi nel .env
             env_file = Path('.env')
             with open(env_file, 'w') as f:
@@ -235,9 +245,14 @@ class CloudflarePasswordDialog(QDialog):
             # Aggiorna la variabile d'ambiente
             os.environ['CLOUDFLARE_PASSWORD'] = password
             
-            QMessageBox.information(self, t("ui.success"), 
-                                   t("cloudflare.password_saved") + "\n\n" +
-                                   "Vous serez demandé pour ce mot de passe lors de la connexion via Cloudflare.")
+            QMessageBox.information(
+                self, 
+                t("ui.success"), 
+                "✅ " + t("cloudflare.password_saved") + "\n\n" +
+                "⚠️ Ricorda:\n" +
+                "• Accesso locale: NO password\n" +
+                "• Accesso Cloudflare: password richiesta"
+            )
             
             self.password = password
             self.accept()

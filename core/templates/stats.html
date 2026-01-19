@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Statistiche Collezione - Pokémon TCG Pocket</title>
+    <style>
+        :root {
+            --bg-primary: #2b2d31;
+            --bg-secondary: #1e1f22;
+            --text-primary: #e4e4e7;
+            --text-secondary: #a1a1aa;
+            --accent: #f4c542;
+            --accent-hover: #f9c74f;
+            --border: #3a3c42;
+            --success: #57f287;
+            --danger: #ed4245;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 32px;
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .page-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 4px 12px rgba(244, 197, 66, 0.2);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-unit {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin: 32px 0 16px 0;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+        }
+
+        .widget-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .widget-card {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .widget-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .widget-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .widget-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .widget-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .widget-item-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .widget-item-value {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+
+        thead {
+            background-color: rgba(244, 197, 66, 0.1);
+            border-bottom: 2px solid var(--accent);
+        }
+
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody tr:hover {
+            background-color: rgba(244, 197, 66, 0.05);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 32px;
+            color: var(--text-secondary);
+        }
+
+        .error {
+            background-color: rgba(237, 66, 69, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
+            padding: 16px;
+            color: var(--danger);
+            margin: 16px 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 16px;
+            color: var(--text-secondary);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background-color: var(--bg-primary);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), var(--accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--bg-primary);
+            transition: width 0.3s ease;
+        }
+
+        .rarity-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            border: 1px solid currentColor;
+        }
+
+        .rarity-common {
+            background-color: rgba(150, 150, 150, 0.2);
+            color: #b0b0b0;
+        }
+
+        .rarity-uncommon {
+            background-color: rgba(87, 242, 135, 0.2);
+            color: #57f287;
+        }
+
+        .rarity-rare {
+            background-color: rgba(88, 165, 255, 0.2);
+            color: #58a5ff;
+        }
+
+        .rarity-double {
+            background-color: rgba(255, 180, 100, 0.2);
+            color: #ffb464;
+        }
+
+        .rarity-crown {
+            background-color: rgba(237, 66, 69, 0.2);
+            color: #ed4245;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+
+            .page-header {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+
+            .stat-card {
+                padding: 16px;
+            }
+
+            .stat-value {
+                font-size: 1.8rem;
+            }
+
+            .stat-label {
+                font-size: 0.75rem;
+            }
+
+            h2 {
+                font-size: 1.2rem;
+                margin: 24px 0 12px 0;
+            }
+
+            .widget-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .widget-card {
+                padding: 16px;
+            }
+
+            table {
+                font-size: 0.85rem;
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            th, td {
+                padding: 8px 10px;
+            }
+
+            .rarity-badge {
+                font-size: 0.7rem;
+                padding: 3px 8px;
+            }
+
+            .progress-bar {
+                height: 20px;
+            }
+
+            .progress-fill {
+                font-size: 0.7rem;
+            }
+
+            .widget-item-label {
+                font-size: 0.85rem;
+            }
+
+            .widget-item-value {
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-value {
+                font-size: 2rem;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 6px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="page-header">
+            <h1>📊 Statistiche Collezione Pokémon TCG Pocket</h1>
+            <p class="page-subtitle">Visualizzazione completa della tua collezione</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Account Totali</div>
+                <div class="stat-value" id="totalAccounts">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Carte Possedute</div>
+                <div class="stat-value" id="uniqueOwned">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Copie Totali</div>
+                <div class="stat-value" id="totalCopies">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Carte Database</div>
+                <div class="stat-value" id="totalCardsDB">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Set Totali</div>
+                <div class="stat-value" id="totalSets">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Completamento</div>
+                <div class="stat-value" id="overallCompletion">-</div>
+                <div class="stat-unit">%</div>
+            </div>
+        </div>
+
+        <!-- Analytics Widgets -->
+        <h2>📈 Analytics</h2>
+        <div class="widget-grid">
+            <div class="widget-card">
+                <div class="widget-header">
+                    <span class="widget-title">💰 Risorse Medie</span>
+                </div>
+                <div class="widget-content" id="avgResourcesWidget">
+                    <div class="loading">Caricamento...</div>
+                </div>
+            </div>
+            <div class="widget-card">
+                <div class="widget-header">
+                    <span class="widget-title">🎯 Carte Più Rare</span>
+                </div>
+                <div class="widget-content" id="rarestCardsWidget">
+                    <div class="loading">Caricamento...</div>
+                </div>
+            </div>
+            <div class="widget-card">
+                <div class="widget-header">
+                    <span class="widget-title">📊 Statistiche Collezione</span>
+                </div>
+                <div class="widget-content" id="collectionStatsWidget">
+                    <div class="loading">Caricamento...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Accounts -->
+        <h2>👥 Top Account</h2>
+        <div id="topAccountsContainer">
+            <div class="loading">Caricamento...</div>
+        </div>
+
+        <!-- Top Cards -->
+        <h2>🎴 Top Carte</h2>
+        <div id="topCardsContainer">
+            <div class="loading">Caricamento...</div>
+        </div>
+
+        <!-- Rarity Distribution -->
+        <h2>💎 Distribuzione per Rarità</h2>
+        <div id="rarityContainer">
+            <div class="loading">Caricamento...</div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = '/stats/data';
+
+        // Load Summary Stats
+        async function loadSummary() {
+            try {
+                const response = await fetch(`${API_BASE}/summary`);
+                const data = await response.json();
+
+                document.getElementById('totalAccounts').textContent = data.totalAccounts || 0;
+                document.getElementById('uniqueOwned').textContent = data.uniqueOwned || 0;
+                document.getElementById('totalCopies').textContent = data.totalCopies || 0;
+                document.getElementById('totalCardsDB').textContent = data.totalCardsDB || 0;
+                document.getElementById('totalSets').textContent = data.totalSets || 0;
+                document.getElementById('overallCompletion').textContent = (data.overallCompletion || 0).toFixed(1);
+            } catch (error) {
+                console.error('❌ Errore caricamento summary:', error);
+            }
+        }
+
+        // Load Top Accounts
+        async function loadTopAccounts() {
+            try {
+                const response = await fetch(`${API_BASE}/top-accounts`);
+                const accounts = await response.json();
+
+                if (!accounts || accounts.length === 0) {
+                    document.getElementById('topAccountsContainer').innerHTML = 
+                        '<div class="empty-state">Nessun account trovato</div>';
+                    return;
+                }
+
+                let html = '<table><thead><tr>';
+                html += '<th>#</th>';
+                html += '<th>Nome Account</th>';
+                html += '<th>Carte Uniche</th>';
+                html += '<th>Copie Totali</th>';
+                html += '<th>✨ Shiny Dust</th>';
+                html += '<th>⏳ Hourglasses</th>';
+                html += '</tr></thead><tbody>';
+
+                accounts.forEach((acc, index) => {
+                    html += '<tr>';
+                    html += `<td>${index + 1}</td>`;
+                    html += `<td><strong>${acc.account_name || acc.device_account}</strong></td>`;
+                    html += `<td>${acc.unique_cards || 0}</td>`;
+                    html += `<td>${acc.total_copies || 0}</td>`;
+                    html += `<td>${acc.shiny_dust || 0}</td>`;
+                    html += `<td>${acc.hourglasses || 0}</td>`;
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+                document.getElementById('topAccountsContainer').innerHTML = html;
+            } catch (error) {
+                console.error('❌ Errore caricamento top accounts:', error);
+                document.getElementById('topAccountsContainer').innerHTML = 
+                    `<div class="error">Errore caricamento dati</div>`;
+            }
+        }
+
+        // Load Top Cards
+        async function loadTopCards() {
+            try {
+                const response = await fetch(`${API_BASE}/top-cards`);
+                const cards = await response.json();
+
+                if (!cards || cards.length === 0) {
+                    document.getElementById('topCardsContainer').innerHTML = 
+                        '<div class="empty-state">Nessuna carta trovata</div>';
+                    return;
+                }
+
+                let html = '<table><thead><tr>';
+                html += '<th>#</th>';
+                html += '<th>Numero</th>';
+                html += '<th>Nome Carta</th>';
+                html += '<th>Set</th>';
+                html += '<th>Copie Totali</th>';
+                html += '<th>Possessori</th>';
+                html += '</tr></thead><tbody>';
+
+                cards.forEach((card, index) => {
+                    html += '<tr>';
+                    html += `<td>${index + 1}</td>`;
+                    html += `<td>${card.cardNumber || '-'}</td>`;
+                    html += `<td>${card.cardName || '-'}</td>`;
+                    html += `<td>${card.setCode || '-'}</td>`;
+                    html += `<td>${card.totalCopies || 0}</td>`;
+                    html += `<td>${card.numOwners || 0}</td>`;
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+                document.getElementById('topCardsContainer').innerHTML = html;
+            } catch (error) {
+                console.error('❌ Errore caricamento top cards:', error);
+                document.getElementById('topCardsContainer').innerHTML = 
+                    `<div class="error">Errore caricamento dati</div>`;
+            }
+        }
+
+        // Load Rarity Distribution
+        async function loadRarityDistribution() {
+            try {
+                const response = await fetch(`${API_BASE}/rarity-distribution`);
+                const rarities = await response.json();
+
+                if (!rarities || rarities.length === 0) {
+                    document.getElementById('rarityContainer').innerHTML = 
+                        '<div class="empty-state">Nessuna rarità trovata</div>';
+                    return;
+                }
+
+                let html = '<table><thead><tr>';
+                html += '<th>Rarità</th>';
+                html += '<th>Nel Database</th>';
+                html += '<th>Possedute</th>';
+                html += '<th>Copie Totali</th>';
+                html += '<th>Completamento</th>';
+                html += '</tr></thead><tbody>';
+
+                rarities.forEach((rarity) => {
+                    const rarityClass = rarity.rarity.toLowerCase().replace(' ', '-');
+                    const completion = rarity.completion || 0;
+
+                    html += '<tr>';
+                    html += `<td><span class="rarity-badge rarity-${rarityClass}">${rarity.rarity}</span></td>`;
+                    html += `<td>${rarity.inDatabase || 0}</td>`;
+                    html += `<td>${rarity.ownedUnique || 0}</td>`;
+                    html += `<td>${rarity.totalCopies || 0}</td>`;
+                    html += '<td>';
+                    html += '<div class="progress-bar">';
+                    html += `<div class="progress-fill" style="width: ${completion}%">${completion.toFixed(1)}%</div>`;
+                    html += '</div>';
+                    html += '</td>';
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+                document.getElementById('rarityContainer').innerHTML = html;
+            } catch (error) {
+                console.error('❌ Errore caricamento rarities:', error);
+                document.getElementById('rarityContainer').innerHTML = 
+                    `<div class="error">Errore caricamento dati</div>`;
+            }
+        }
+
+        // Load Analytics Widgets
+        async function loadAnalyticsWidgets() {
+            try {
+                // Average Resources Widget
+                const accountsResponse = await fetch(`${API_BASE}/top-accounts`);
+                const accounts = await accountsResponse.json();
+                
+                if (accounts && accounts.length > 0) {
+                    const avgShiny = Math.round(accounts.reduce((sum, acc) => sum + (acc.shiny_dust || 0), 0) / accounts.length);
+                    const avgHourglasses = Math.round(accounts.reduce((sum, acc) => sum + (acc.hourglasses || 0), 0) / accounts.length);
+                    const maxShiny = Math.max(...accounts.map(acc => acc.shiny_dust || 0));
+                    const maxHourglasses = Math.max(...accounts.map(acc => acc.hourglasses || 0));
+
+                    let html = '<div class="widget-item">';
+                    html += '<span class="widget-item-label">✨ Shiny Dust (media)</span>';
+                    html += `<span class="widget-item-value">${avgShiny}</span>`;
+                    html += '</div>';
+                    html += '<div class="widget-item">';
+                    html += '<span class="widget-item-label">⏳ Hourglasses (media)</span>';
+                    html += `<span class="widget-item-value">${avgHourglasses}</span>`;
+                    html += '</div>';
+                    html += '<div class="widget-item">';
+                    html += '<span class="widget-item-label">✨ Max Shiny Dust</span>';
+                    html += `<span class="widget-item-value">${maxShiny}</span>`;
+                    html += '</div>';
+                    html += '<div class="widget-item">';
+                    html += '<span class="widget-item-label">⏳ Max Hourglasses</span>';
+                    html += `<span class="widget-item-value">${maxHourglasses}</span>`;
+                    html += '</div>';
+
+                    document.getElementById('avgResourcesWidget').innerHTML = html;
+                }
+
+                // Rarest Cards Widget
+                const cardsResponse = await fetch(`${API_BASE}/top-cards`);
+                const cards = await cardsResponse.json();
+                
+                if (cards && cards.length > 0) {
+                    const rarestCards = [...cards].sort((a, b) => (a.numOwners || 0) - (b.numOwners || 0)).slice(0, 5);
+                    
+                    let html = '';
+                    rarestCards.forEach((card, idx) => {
+                        html += '<div class="widget-item">';
+                        html += `<span class="widget-item-label">${idx + 1}. ${card.cardName || 'N/A'}</span>`;
+                        html += `<span class="widget-item-value">${card.numOwners || 0} owner</span>`;
+                        html += '</div>';
+                    });
+
+                    document.getElementById('rarestCardsWidget').innerHTML = html || '<div class="empty-state">Nessuna carta trovata</div>';
+                }
+
+                // Collection Stats Widget
+                const summaryResponse = await fetch(`${API_BASE}/summary`);
+                const summary = await summaryResponse.json();
+                
+                if (summary) {
+                    const avgPerAccount = summary.totalAccounts > 0 ? Math.round(summary.uniqueOwned / summary.totalAccounts) : 0;
+                    const avgCopiesPerCard = summary.uniqueOwned > 0 ? (summary.totalCopies / summary.uniqueOwned).toFixed(1) : 0;
+
+                    let html = '<div class="widget-item">';
+                    html += '<span class="widget-item-label">Carte medie/account</span>';
+                    html += `<span class="widget-item-value">${avgPerAccount}</span>`;
+                    html += '</div>';
+                    html += '<div class="widget-item">';
+                    html += '<span class="widget-item-label">Copie medie/carta</span>';
+                    html += `<span class="widget-item-value">${avgCopiesPerCard}</span>`;
+                    html += '</div>';
+                    html += '<div class="widget-item">';
+                    html += '<span class="widget-item-label">Carte mancanti</span>';
+                    html += `<span class="widget-item-value">${summary.totalCardsDB - summary.uniqueOwned}</span>`;
+                    html += '</div>';
+
+                    document.getElementById('collectionStatsWidget').innerHTML = html;
+                }
+            } catch (error) {
+                console.error('❌ Errore caricamento widgets:', error);
+            }
+        }
+
+        // Load all data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSummary();
+            loadTopAccounts();
+            loadTopCards();
+            loadRarityDistribution();
+            loadAnalyticsWidgets();
+
+            // Refresh every 30 seconds
+            setInterval(() => {
+                loadSummary();
+                loadTopAccounts();
+                loadTopCards();
+                loadRarityDistribution();
+                loadAnalyticsWidgets();
+            }, 30000);
+        });
+    </script>
+</body>
+</html>

@@ -1,9 +1,19 @@
 {
+  "language": "French",
+  "language_code": "fr",
+  
   "database": {
-    "not_found_warning": "Base de données non trouvée",
-    "please_run_scraper": "Veuillez d'abord exécuter le scraper dans l'onglet 'Database Setup'",
+    "not_found": "Base de données non trouvée",
+    "not_found_message": "Veuillez d'abord exécuter le scraper dans l'onglet 'Database Setup'",
+    "table_cards_not_exists": "La table 'cards' n'existe pas encore",
+    "table_cards_not_exists_in_db": "La table 'cards' n'existe pas dans la base de données",
     "loaded_successfully": "Base de données chargée avec succès",
-    "ready_monitoring": "Prêt pour le monitoring"
+    "ready_monitoring": "Prêt pour le monitoring",
+    "not_found_warning": "Base de données non trouvée !",
+    "please_run_scraper": "Veuillez aller dans l'onglet 'Database Setup' et lancer le scraper d'abord.",
+    "content_check": "Contenu de la base de données",
+    "sets_count": "Sets",
+    "cards_count": "Cartes"
   },
   
   "migration": {
@@ -53,6 +63,8 @@
   
   "scraper": {
     "retrieving_sets_error": "Erreur de récupération des sets",
+    "retrieving_sets": "Récupération de la liste des sets...",
+    "sets_found": "Trouvé {count} sets",
     "upscaled": "Agrandi : {original} → {upscaled}",
     "cover_downloaded": "Couverture ({mode}) téléchargée, agrandie (2x) et optimisée ({size}KB)",
     "cover_error": "Erreur de téléchargement/amélioration de la couverture",
@@ -65,16 +77,13 @@
     "no_cards_found": "Aucune carte trouvée pour le set {code}",
     "found_cards": "Trouvé {count} cartes dans le set {code}",
     "progress": "Progression : {idx}/{total} cartes traitées...",
-    "processing_card_error": "Erreur de traitement de la carte",
-    "retrieving_sets": "Récupération de la liste des sets...",
-    "sets_found": "Trouvé {count} sets"
+    "processing_card_error": "Erreur de traitement de la carte"
   },
   
   "bot_status": {
-    "connected": "Connecté",
-    "monitoring": "Monitoring",
-    "stopped": "Arrêté",
-    "starting": "Démarrage..."
+    "starting": "Statut : 🟡 Démarrage...",
+    "stopped": "Statut : ⚫ Arrêté",
+    "monitoring": "Monitoring"
   },
   
   "scraper_ui": {
@@ -225,6 +234,39 @@
     "database_setup": "Configuration de la base de données",
     "statistics": "Statistiques",
     "settings": "Paramètres",
+
+    "settings_tab": {
+      "notification_group_title": "🔔 Notification Settings",
+      "notification_channel_placeholder": "Discord Channel ID for notifications (different from scan channel)",
+      "notification_enable_checkbox": "Enable custom notifications (future)",
+      "rarity_filter_group": "🎴 Rarity Filter Settings",
+      "bot_path_group": "🤖 Bot Path (AHK)",
+      "bot_path_placeholder": "Path to the folder containing the .ahk scripts (e.g., 1.ahk, 2.ahk...)",
+      "browse_button": "Browse...",
+      "notification_channel_label": "Notification Channel ID:",
+      "theme_label": "Theme:",
+      "dark_theme_checkbox": "Dark Theme (Default)",
+      "autostart_checkbox": "Auto-start bot on launch",
+      "minimize_to_tray_checkbox": "Minimize to system tray",
+      "clear_cards_log_button": "Clear Cards Log",
+      "clear_cards_log_tooltip": "Clears only the 'found_cards' table (the 'Cards Found' tab). Does not reset inventory.",
+      "reset_inventory_button": "Reset Inventory",
+      "reset_inventory_tooltip": "WARNING: Clears the 'account_inventory' table. You will lose your collection counts.",
+      "reset_trades_button": "Reset Trades (Rescan)",
+      "reset_trades_tooltip": "WARNING: Clears the 'trades' table. On next start, the bot will perform a full historical scan.",
+      "open_data_folder_button": "📂 Open Data Folder",
+      "open_data_folder_tooltip": "Opens the AppData folder where the database, logs, and settings are saved.",
+      "show_info_tooltip": "Show info and credits"
+    },
+    "tray": {
+      "show": "Afficher",
+      "quit": "Quitter"
+    },
+    "dialog": {
+      "clear_found_cards_log_title": "Vider le journal des cartes trouvées",
+      "clear_found_cards_log_text": "Vous êtes sur le point de vider le journal des cartes trouvées (l'onglet 'Cartes trouvées').\\n\\nCeci NE réinitialise PAS votre inventaire de collection.\\n\\nÊtes-vous sûr de vouloir continuer ?"
+    },
+    "app_running_in_background": "L'application est en arrière-plan",
     
     "bot_token": "Token du Bot :",
     "channel_id": "ID du Canal :",
@@ -307,7 +349,20 @@
     "found_cards_cleared": "✅ {count} entrées supprimées de l'historique des cartes trouvées.",
     "error_clearing_found_cards": "Erreur lors de la suppression des cartes trouvées",
     "success": "Succès",
-    "info": "Information"
+    "info": "Information",
+    "accounts_tab_with_icon": "👤 Comptes",
+    "config_group_with_icon": "🔧 Configuration",
+    "status_group_with_icon": "📊 Statut",
+    "log_group_with_icon": "📝 Journal",
+    "recent_trades_group_with_icon": "📦 Échanges Récents",
+    "discord_bot_tab_with_icon": "🤖 Bot Discord",
+    "cards_found_tab_with_icon": "🎴 Cartes Trouvées",
+    "collection_tab_with_icon": "📚 Collection",
+    "database_setup_tab_with_icon": "💾 Configuration de la base de données",
+    "statistics_tab_with_icon": "📊 Statistiques",
+    "delete_done": "L'inventaire a été réinitialisé avec succès.",
+    "app_data_error": "Le dossier AppData n'existe pas",
+    "inventory_full": "L'inventaire est déjà vide."
   },
   
   "web": {
@@ -403,5 +458,80 @@
     "across": "sur",
     "account": "compte",
     "accounts": "comptes"
-  }
+  },
+  
+  "trade_log.reset_title": "Réinitialiser le journal des transactions",
+  "trade_log.reset_warning": "Vous êtes sur le point de supprimer l'intégralité du journal des transactions.\n\nAu prochain démarrage, le bot effectuera une analyse historique complète de Discord.\n\nÊtes-vous sûr ?",
+  "trade_log.already_empty": "Le journal des transactions est déjà vide.",
+  "trade_log.reset_success": "Journal des transactions réinitialisé. {count} lignes supprimées.",
+  "trade_log.reset_error_title": "Erreur lors de la réinitialisation du journal",
+  "trade_log.reset_error_body": "Impossible de réinitialiser le journal des transactions : {e}",
+
+  "error.title": "Erreur",
+  "error.generic_body": "Erreur : {e}",
+  "error.db_connection_failed_title": "❌ Erreur de base de données",
+  "error.db_connection_failed_body": "Impossible de se connecter à la base de données",
+  "error.db_manager_connection_failed_title": "Erreur du gestionnaire de base de données",
+  "error.db_manager_connection_failed_body": "Impossible de se connecter au gestionnaire de base de données. La liste de souhaits ne fonctionnera pas.",
+  "error.folder_open_failed_title": "Erreur lors de l'ouverture du dossier",
+  "error.folder_open_failed_body": "Impossible d'ouvrir le dossier : {e}",
+
+  "warning.title": "Avertissement",
+  "warning.db_not_found": "Base de données non trouvée. Veuillez d'abord exécuter le scraper.",
+  "warning.select_one_channel": "Veuillez sélectionner au moins un canal à scanner.",
+
+  "info.title": "Info",
+
+  "channel.checkbox_label": "#{channel_name} ({channel_id})",
+
+  "app.restarting": "🔄 Redémarrage de l'application...",
+  "app.restart_failed_title": "Échec du redémarrage",
+  "app.restart_failed_body": "Impossible de redémarrer l'application : {e}\n\nVeuillez redémarrer manuellement.",
+  "download.failed_title": "Échec du téléchargement",
+  "download.cloudflared_failed": "Impossible de télécharger cloudflared : {e}\n\nVeuillez le télécharger manuellement depuis :\nhttps://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/\n\net placez 'cloudflared.exe' dans :\n{app_dir}",
+
+  "credits.dialog_title": "Crédits",
+  "credits.html_content": "<div style=\"color: #e0e0e0; font-family: 'Segoe UI', Arial, sans-serif;\">\n            <p style=\"font-size: 13px; font-weight: bold; color: #3498db; margin-bottom: 10px;\">
+                🎴 Outil Pokemon TeamRocket
+            </p>\n            \n            <p style=\"margin-bottom: 12px;\">
+                Merci d'avoir téléchargé <b>l'Outil Pokemon TeamRocket</b> !<br>
+                Créé par <b style=\"color: #e74c3c;\">pcb.is.good</b>, \n                conçu pour fonctionner avec \n                <a href=\"https://github.com/Arturo-1212/PTCGPB\" \n                style=\"color: #3498db; text-decoration: none;\">
+                    Arturo-1212/PTCGPB
+                </a>.
+            </p>\n            \n            <p style=\"font-size: 12px; font-weight: bold; color: #f39c12; margin-top: 15px; margin-bottom: 8px;\">
+                💝 Remerciements spéciaux :
+            </p>
+            <ul style=\"margin-left: 20px; margin-top: 5px;\">
+                <li style=\"margin-bottom: 5px;\">
+                    <b>Arturo</b> (Créateur du bot) - \n                    <a href=\"https://github.com/Arturo-1212\" \n                    style=\"color: #3498db; text-decoration: none;\">
+                        Arturo-1212
+                    </a>
+                </li>
+                <li style=\"margin-bottom: 5px;\">
+                    <b>GummyBaer</b> (Commentaires + Algorithme de correspondance de cartes et de paquets)
+                </li>
+            </ul>\n            \n            <p style=\"margin-top: 15px; margin-bottom: 8px;\">
+                Pour toute question, consultez le Discord officiel du bot :
+            </p>
+            <p style=\"margin-left: 20px;\">
+                🔗 <a href=\"https://discord.gg/Msa5vNjUUf\" \n                    style=\"color: #7289da; text-decoration: none; font-weight: bold;\">
+                    discord.gg/Msa5vNjUUf
+                </a>
+            </p>\n            \n            <hr style=\"border: none; border-top: 1px solid #555; margin: 15px 0;\">
+            \n            <p style=\"font-size: 10px; color: #888; text-align: center;\">
+                Version 1.0 | Construit avec ❤️ pour la communauté TCG Pocket
+            </p>
+        </div>",
+
+  "config.settings_not_found": "Fichier de paramètres non trouvé. Création par défaut dans : {file}",
+  "config.settings_creation_error": "ERREUR CRITIQUE : Impossible de créer le fichier settings.json : {e}",
+  "config.settings_loading_warning": "Avertissement : Erreur lors du chargement des paramètres : {e}",
+  "config.settings_saving_error": "Erreur : Impossible d'enregistrer les paramètres : {e}",
+  "config.paths_info_title": "INFO CHEMINS APPDATA",
+  "config.app_data_dir": "Dossier App Data :",
+  "config.settings_file": "Fichier de paramètres :",
+  "config.database": "Base de données :",
+  "config.accounts_dir": "Dossier Comptes :",
+  "config.cache_dir": "Dossier Cache :",
+  "config.logs_dir": "Dossier Logs :"
 }

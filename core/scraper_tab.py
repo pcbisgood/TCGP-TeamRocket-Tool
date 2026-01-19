@@ -184,10 +184,15 @@ class ScraperTab(QWidget):
                 cursor.execute("SELECT COUNT(*) FROM cards")
                 cards_count = cursor.fetchone()[0]
                 
+                # ✅ NUOVO: Conta i set che hanno un BLOB
+                cursor.execute("SELECT COUNT(*) FROM sets WHERE cover_image_blob IS NOT NULL")
+                sets_with_cover_count = cursor.fetchone()[0]
+                
                 cursor.execute("SELECT set_code, set_name, total_cards FROM sets")
                 sets_list = cursor.fetchall()
                 
-                msg = f"📊 Database Content:\n\nSets: {sets_count}\nCards: {cards_count}\n\n"
+                # ✅ AGGIUNTO: Include l'informazione del BLOB nel messaggio
+                msg = f"📊 Database Content:\n\nSets: {sets_count} (Cover BLOB: {sets_with_cover_count})\nCards: {cards_count}\n\n"
                 
                 if sets_list:
                     msg += "Sets in database:\n"

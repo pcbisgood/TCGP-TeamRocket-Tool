@@ -4,14 +4,18 @@ Questo modulo contiene l'intero QWidget per la scheda "Collezione",
 inclusa la logica di caricamento, i filtri e la visualizzazione della griglia.
 """
 
-# Import PyQt5
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QScrollArea, QFrame,
     QComboBox, QLineEdit, QToolButton, QSizePolicy, 
-    QGraphicsOpacityEffect, QApplication
+    QGraphicsOpacityEffect, QApplication, # Assicurati che QGraphicsOpacityEffect sia qui
+    QListWidget, QListWidgetItem
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QThreadPool, QRunnable, QObject, pyqtSlot, QUrl
+from PyQt5.QtCore import (
+    Qt, pyqtSignal, QTimer, QSize, QThreadPool, QRunnable, 
+    QObject, pyqtSlot, QUrl, QPoint,
+    QEvent, QRect  # <-- AGGIUNGI QUESTI DUE
+)
 from PyQt5.QtGui import QPixmap, QFont
 
 # Import standard
@@ -32,45 +36,86 @@ if TYPE_CHECKING:
     from .ui_main_window import MainWindow
 
 from .ui_widgets import CollectionCardDialog
+import time
+
+
+
 
 # ================================================================
-# 1. CLASSI HELPER PER IL DOWNLOAD ASINCRONO
-# (Spostate da ui_main_window.py)
+# WORKER PER LA RICERCA ASINCRONA
 # ================================================================
 
-class ImageLoaderSignals(QObject):
-    finished = pyqtSignal(bytes, str, QLabel)
-    error = pyqtSignal(str, str, QLabel)
+class SearchWorkerSignals(QObject):
+    """
+    Definisce i segnali disponibili per il thread di ricerca.
+    """
+    finished = pyqtSignal(list) # Emette la lista di risultati (dizionari)
+    error = pyqtSignal(str)     # Emette un errore
 
-class ImageDownloaderWorker(QRunnable):
-    def __init__(self, image_url: str, target_label: QLabel):
+
+
+class SearchWorkerSignals(QObject):
+    """Definisce i segnali disponibili per il thread di ricerca."""
+    finished = pyqtSignal(list)  # Emette la lista di risultati
+    error = pyqtSignal(str)      # Emette un errore
+
+
+class SearchWorker(QRunnable):
+    """Worker che esegue la query di ricerca in un thread separato."""
+    
+    def __init__(self, search_text, selected_account, is_all_accounts):
         super().__init__()
-        self.image_url = image_url
-        self.target_label = target_label
-        self.signals = ImageLoaderSignals()
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-
-    @pyqtSlot()
+        self.search_text = search_text
+        self.selected_account = selected_account
+        self.is_all_accounts = is_all_accounts
+        self.signals = SearchWorkerSignals()
+    
+    # ✅ RIMOSSO @pyqtSlot - Non serve su QRunnable.run()
     def run(self):
-        if not self.image_url or not self.image_url.startswith('http'):
-            self.signals.error.emit("URL non valido", self.image_url, self.target_label)
-            return
-            
+        """Esegue la query al DB."""
         try:
-            req = urllib.request.Request(self.image_url, headers=self.headers)
-            with urllib.request.urlopen(req, timeout=10) as response:
-                image_data = response.read()
+            results = []
+            with sqlite3.connect(DB_FILENAME) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
                 
-            if image_data:
-                self.signals.finished.emit(image_data, self.image_url, self.target_label)
-            else:
-                self.signals.error.emit("Dati immagine vuoti", self.image_url, self.target_label)
+                # Query SEMPLICE e VELOCE
+                query = '''
+                    SELECT 
+                        c.id as card_id,
+                        c.card_name,
+                        c.thumbnail_blob,
+                        s.cover_image_blob,
+                        COALESCE((
+                            SELECT SUM(quantity) 
+                            FROM account_inventory 
+                            WHERE card_id = c.id
+                        ), 0) as quantity
+                    FROM cards c
+                    JOIN sets s ON c.set_code = s.set_code
+                    WHERE c.card_name LIKE ?
+                    ORDER BY c.card_name
+                    LIMIT 20
+                '''
+                
+                search_param = f"%{self.search_text}%"
+                cursor.execute(query, [search_param])
+                
+                for row in cursor.fetchall():
+                    results.append({
+                        'card_id': row['card_id'],
+                        'card_name': row['card_name'],
+                        'thumbnail_blob': row['thumbnail_blob'],
+                        'cover_image_blob': row['cover_image_blob'],
+                        'quantity': row['quantity']
+                    })
+                
+                self.signals.finished.emit(results)
                 
         except Exception as e:
-            print(f"❌ Errore download miniatura UI: {e} | URL: {self.image_url}")
-            self.signals.error.emit(str(e), self.image_url, self.target_label)
+            error_msg = f"❌ Errore live search thread: {str(e)}"
+            print(error_msg)
+            self.signals.error.emit(error_msg)
 
 
 # ================================================================
@@ -102,7 +147,8 @@ class CollectionTab(QWidget):
         
         # 5. Avvia la costruzione dell'interfaccia
         self.setup_ui()
-
+        self.setup_search_completer()
+        QApplication.instance().installEventFilter(self)
     # ----------------------------------------------------------------
     # COSTRUZIONE INTERFACCIA (Spostato da setup_collection_tab)
     # ----------------------------------------------------------------
@@ -146,23 +192,9 @@ class CollectionTab(QWidget):
         filters_layout.addWidget(QLabel(t("collection_ui.search")))
         self.collection_search_input = QLineEdit()
         self.collection_search_input.setPlaceholderText(t("collection_ui.search_placeholder"))
-        self.collection_search_input.textChanged.connect(self.apply_collection_filters)
+        self.collection_search_input.textChanged.connect(self.on_search_text_changed)
         filters_layout.addWidget(self.collection_search_input)
-        
-        filters_layout.addWidget(QLabel(t("collection_ui.ownership_filter")))
-        self.collection_ownership_filter = QComboBox()
-        self.collection_ownership_filter.addItem(t("collection_ui.filter_all"), "all")
-        self.collection_ownership_filter.addItem(t("collection_ui.filter_owned"), "owned")
-        self.collection_ownership_filter.addItem(t("collection_ui.filter_missing"), "missing")
-        self.collection_ownership_filter.currentIndexChanged.connect(self.apply_collection_filters)
-        filters_layout.addWidget(self.collection_ownership_filter)
-        
-        self.collection_rarity_filter = QComboBox()
-        self.collection_rarity_filter.addItem(t("collection_ui.filter_all"), "all")
-        for rarity_name in RARITY_DATA.keys():
-            self.collection_rarity_filter.addItem(rarity_name, rarity_name)
-        self.collection_rarity_filter.currentIndexChanged.connect(self.apply_collection_filters)
-        filters_layout.addWidget(self.collection_rarity_filter)
+              
         
         filters_layout.addStretch()
         collection_layout.addLayout(filters_layout)
@@ -355,7 +387,7 @@ class CollectionTab(QWidget):
                 # ================================================================
                 print("Query 3: Caricamento tutti i set...")
                 cursor.execute("""
-                    SELECT set_code, set_name, total_cards, cover_image_path 
+                    SELECT set_code, set_name, total_cards, cover_image_blob 
                     FROM sets 
                     ORDER BY release_date DESC
                 """)
@@ -378,11 +410,12 @@ class CollectionTab(QWidget):
                     QApplication.processEvents()
                     
                     total_cards = set_row['total_cards'] if set_row['total_cards'] else 0
-                    cover_path = set_row['cover_image_path']
+                    cover_blob = set_row['cover_image_blob'] 
+                    
                     set_stats = stats_map.get(set_code, (0, 0)) # (owned, copies)
                     
                     set_section = self.create_set_section_fast(
-                        set_code, set_name, total_cards, cover_path,
+                        set_code, set_name, total_cards, cover_blob,
                         set_stats[0], # owned_count
                         set_stats[1], # total_copies
                         cursor # Passa il cursore per il lazy loading
@@ -407,15 +440,11 @@ class CollectionTab(QWidget):
             import traceback
             traceback.print_exc()
 
-    def create_set_section_fast(self, set_code, set_name, total_cards, cover_path, 
+    def create_set_section_fast(self, set_code, set_name, total_cards, cover_blob, 
                                 owned_count, total_copies, cursor):
         """
         Crea una sezione collapsible per un set.
-        MODIFICATO (Pillar 3: N+1 Query):
-        - Rimuove le query per le statistiche (calcolate in 'refresh_collection').
-        - Accetta 'owned_count' e 'total_copies' come parametri.
-        - Accetta 'global_inventory_map' e la passa a 'toggle_content'
-          per il lazy loading.
+        MODIFICATO: Usa 'cover_blob' (bytes) invece di 'cover_path' (stringa URL/Path).
         """
         try:
             # Frame principale
@@ -451,7 +480,6 @@ class CollectionTab(QWidget):
             header_layout.addWidget(arrow_btn)
             
             # Cover image (se esiste)
-            # MODIFICATO (Pillar 2): Usa il loader asincrono
             cover_label = QLabel()
             cover_label.setFixedSize(60, 40)
             cover_label.setStyleSheet("""
@@ -461,14 +489,22 @@ class CollectionTab(QWidget):
                     background-color: #2a2a2a;
                 }
             """)
-            # 'cover_path' ora è un URL dalla tua API
-            self.load_card_image_async(cover_path, cover_label, 60, 40)
+            
+            # ✅ NUOVA LOGICA: CARICAMENTO SINCRONO DEL BLOB
+            if cover_blob:
+                pixmap = QPixmap()
+                # Carica la QPixmap direttamente dai bytes
+                pixmap.loadFromData(cover_blob) 
+                if not pixmap.isNull():
+                    scaled_pixmap = pixmap.scaled(60, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    cover_label.setPixmap(scaled_pixmap)
+            else:
+                # Usa il placeholder se il BLOB non è presente
+                cover_label.setPixmap(self.placeholder_pixmap.scaled(60, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
             header_layout.addWidget(cover_label)
 
-            # =========================================================================
-            # ❌ RIMOSSO (Pillar 3): Blocco "Calcola statistiche del set"
-            # (I dati 'owned_count' e 'total_copies' ora sono passati come argomenti)
-            # =========================================================================
+            # ... (Resto della funzione invariato)
             
             completion = (owned_count / total_cards * 100) if total_cards and total_cards > 0 else 0
             
@@ -601,15 +637,15 @@ class CollectionTab(QWidget):
         """Carica le carte per un set specifico (chiamato on-demand)."""
         try:
             print(f"📂 Iniziando lazy load per {set_code}...")
-            
+
             cursor.execute("""
                 SELECT id, card_name, rarity, thumbnail_blob, card_number 
                 FROM cards 
                 WHERE set_code = ?
-                ORDER BY CAST(card_number AS INTEGER)
+                ORDER BY CAST(card_number AS INTEGER), card_name
             """, (set_code,))
             cards = cursor.fetchall()
-            
+
             total_cards = len(cards)
             print(f"📊 Trovate {total_cards} carte in {set_code}")
 
@@ -618,65 +654,61 @@ class CollectionTab(QWidget):
             if existing_layout is None: # Fallback di sicurezza
                 existing_layout = QVBoxLayout(cards_container)
                 cards_container.setLayout(existing_layout)
-            
+
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setStyleSheet("QScrollArea { border: none; }")
-            
+
             grid_widget = QWidget()
             grid_layout = QGridLayout(grid_widget)
             grid_layout.setSpacing(10)
-            
+
             # Salva la griglia per i filtri
             self.collection_card_widgets[set_code] = {
                 'widgets': [],
                 'layout': grid_layout
             }
-            
-            # Carica in batch
-            batch_size = 50
+
+            # Carica tutte le carte senza filtri
             card_index = 0
-            
+            batch_size = 50
             for batch_num in range(0, total_cards, batch_size):
                 batch_cards = cards[batch_num:batch_num + batch_size]
-                
                 for idx, card_row in enumerate(batch_cards):
                     card_id = card_row[0]
                     card_name = card_row[1]
                     rarity = card_row[2]
                     image_blob = card_row[3]
-                    card_number = card_row[4] 
-                    
-                    # Usa la mappa dell'inventario (già caricata)
+                    card_number = card_row[4]
+
                     quantity = self.inventory_map.get(card_id, 0)
-                    
+
                     card_widget = self.create_card_widget(
                         card_id, card_name, rarity, card_number, image_blob, quantity
                     )
-                    
-                    # Salva il widget e i metadati per il filtro
+
                     self.collection_card_widgets[set_code]['widgets'].append((
                         card_widget, card_name, rarity, quantity, card_number
                     ))
-                    
+
                     row = card_index // 5
                     col = card_index % 5
                     card_index += 1
                     grid_layout.addWidget(card_widget, row, col)
-                
+
                 QApplication.processEvents()
                 progress = int((batch_num + len(batch_cards)) / total_cards * 100)
                 self.collection_stats_label.setText(
                     f"⏳ Loading {set_name}... {progress}%"
                 )
                 self.collection_stats_label.repaint()
-            
+
             scroll.setWidget(grid_widget)
             existing_layout.addWidget(scroll)
-            
+
             print(f"✅ {set_code} completato")
             self.collection_stats_label.setText(f"✅ Ready!")
-            
+
         except Exception as e:
             print(f"❌ Errore lazy load {set_code}: {e}")
             import traceback
@@ -845,11 +877,14 @@ class CollectionTab(QWidget):
             with sqlite3.connect(db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                cursor.execute("SELECT account_id, account_name FROM accounts ORDER BY account_name")
+                cursor.execute("""
+                    SELECT device_account, account_name FROM accounts ORDER BY account_name
+                """)
+
                 accounts = cursor.fetchall()
                 
                 for account in accounts:
-                    self.collection_account_combo.addItem(account["account_name"], account["account_id"])
+                    self.collection_account_combo.addItem(account['account_name'], account['device_account'])
             
             # Ripristina la selezione precedente, se esiste ancora
             index = self.collection_account_combo.findText(current_text)
@@ -862,11 +897,129 @@ class CollectionTab(QWidget):
         except Exception as e:
             print(f"❌ Errore caricamento account: {e}")
 
-    def apply_collection_filters(self):
-        """Applica i filtri di ricerca/possesso/rarità."""
-        search_text = self.collection_search_input.text().lower()
-        ownership_filter = self.collection_ownership_filter.currentData()
-        rarity_filter = self.collection_rarity_filter.currentData()
+
+
+    def trigger_live_search_worker(self):
+        """
+        Avvia il SearchWorker in un thread separato.
+        """
+        search_text = self.collection_search_input.text()
+        if len(search_text) < 2:
+            return
+
+        selected_account = self.collection_account_combo.currentText()
+        is_all_accounts = selected_account == t("ui.all_accounts")
+
+        # Crea il worker
+        worker = SearchWorker(search_text, selected_account, is_all_accounts)
+        
+        # Collega i suoi segnali agli slot
+        worker.signals.finished.connect(self.on_search_results_ready)
+        worker.signals.error.connect(lambda e: print(f"❌ Errore live search thread: {e}"))
+        
+        # Esegui sul thread pool della finestra principale
+        self.main_window.image_loader_pool.start(worker)
+
+    @pyqtSlot(list)
+    def on_search_results_ready(self, results: list):
+        """
+        Riceve i risultati dal worker e popola il popup (sul thread UI).
+        """
+        self.search_popup.clear()
+        
+        if not results:
+            self.search_popup.hide()
+            return
+            
+        # Popola il popup
+        for row in results:
+            # Crea il widget usando il BLOB invece del path
+            widget = self.create_search_result_widget(
+                row['card_name'],
+                row['thumbnail_blob'],
+                row['cover_image_blob'],  # <-- MODIFICATO: usa il BLOB invece del path
+                row['quantity']
+            )
+            
+            item = QListWidgetItem()
+            item.setData(Qt.UserRole, row['card_id'])  # Salva il card_id
+            item.setSizeHint(widget.sizeHint())
+            
+            self.search_popup.addItem(item)
+            self.search_popup.setItemWidget(item, widget)
+
+        # Posiziona e mostra il popup
+        self.position_search_popup()
+        self.search_popup.show()
+
+
+    def setup_search_completer(self):
+        """Configura il timer e il popup per la ricerca live."""
+        # Timer per "debouncing" (evita query per ogni tasto)
+        self.search_timer = QTimer(self)
+        self.search_timer.setSingleShot(True)
+        # Collega il timer al NUOVO trigger del worker
+        self.search_timer.timeout.connect(self.trigger_live_search_worker)
+
+        # Il nostro popup personalizzato
+        self.search_popup = QListWidget(self)
+        self.search_popup.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint) # Flag corretto per popup non bloccant
+        self.search_popup.setFocusPolicy(Qt.NoFocus) # Non ruba il focus dal QLineEdit
+        self.search_popup.itemClicked.connect(self.on_search_item_clicked)
+        
+        # Stile per il popup (opzionale ma consigliato)
+        self.search_popup.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #555;
+                background-color: #333;
+                color: white;
+            }
+            QListWidget::item {
+                padding: 5px;
+            }
+            QListWidget::item:hover {
+                background-color: #4a4a4a;
+            }
+        """)
+
+# ================================================================
+    # ✅ GESTIONE CLICK ESTERNO (NUOVA)
+    # ================================================================
+
+    def eventFilter(self, obj, event):
+        """
+        Filtro eventi globale per chiudere il popup di ricerca
+        se si clicca all'esterno.
+        """
+        try:
+            if event.type() == QEvent.MouseButtonPress:
+                if hasattr(self, 'search_popup') and self.search_popup.isVisible():
+                    # Posizione del click
+                    click_pos = event.globalPos()
+                    
+                    # Area del popup
+                    popup_rect = self.search_popup.geometry()
+                    
+                    # Area della barra di ricerca
+                    search_bar_top_left = self.collection_search_input.mapToGlobal(self.collection_search_input.rect().topLeft())
+                    search_bar_bottom_right = self.collection_search_input.mapToGlobal(self.collection_search_input.rect().bottomRight())
+                    search_bar_rect = QRect(search_bar_top_left, search_bar_bottom_right)
+
+                    # Se il click è fuori da entrambi i widget
+                    if not popup_rect.contains(click_pos) and not search_bar_rect.contains(click_pos):
+                        self.search_popup.hide()
+                        self.collection_search_input.clearFocus() # Togli anche il focus
+
+        except Exception as e:
+            # È meglio non far crashare l'event filter
+            print(f"Errore in eventFilter: {e}")
+
+        # Passa l'evento al gestore standard
+        return super().eventFilter(obj, event)
+
+    def apply_collection_filters_with_text(self, search_text: str):
+        """Filtra la griglia (solo per testo)."""
+        search_text = search_text.lower()
         
         for set_code, set_data in self.collection_card_widgets.items():
             widgets = set_data.get('widgets', [])
@@ -877,6 +1030,121 @@ class CollectionTab(QWidget):
                 # Filtro ricerca
                 if search_text and search_text not in card_name.lower():
                     show = False
+                
+                # Filtri di possesso e rarità rimossi
+                
+                widget.setVisible(show)
+
+
+
+
+    def on_search_text_changed(self, text: str):
+        """Chiamato ogni volta che il testo cambia nel QLineEdit."""
+        if len(text) < 2:
+            self.search_timer.stop()
+            self.search_popup.hide()
+        else:
+            # Riavvia il timer (aspetta 300ms prima di cercare)
+            self.search_timer.start(300)
+            
+        # Filtriamo comunque la griglia sottostante
+        self.apply_collection_filters_with_text(text)
+
+
+
+    def create_search_result_widget(self, card_name, thumb_blob, setcover_blob, quantity) -> QWidget:
+        """
+        Crea il widget personalizzato per una riga del popup.
+        MODIFICATO: setcover_blob è bytes (BLOB) invece di un path.
+        """
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(5, 5, 5, 5)
+        
+        # 1. Miniatura Carta
+        thumb_label = QLabel()
+        thumb_label.setFixedSize(40, 56)
+        if thumb_blob:
+            pixmap = QPixmap()
+            pixmap.loadFromData(thumb_blob)
+            thumb_label.setPixmap(pixmap.scaled(40, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            thumb_label.setPixmap(self.placeholder_pixmap.scaled(40, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        layout.addWidget(thumb_label)
+        
+        # 2. Nome Carta
+        name_label = QLabel(f"<b>{card_name}</b>")
+        name_label.setWordWrap(True)
+        layout.addWidget(name_label, 1)
+        
+        # 3. Cover Set (BLOB)
+        setcover_label = QLabel()
+        setcover_label.setFixedSize(45, 30)
+        if setcover_blob:
+            pixmap = QPixmap()
+            pixmap.loadFromData(setcover_blob)  # <-- Carica dal BLOB
+            if not pixmap.isNull():
+                scaled_pixmap = pixmap.scaled(45, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                setcover_label.setPixmap(scaled_pixmap)
+            else:
+                setcover_label.setPixmap(self.placeholder_pixmap.scaled(45, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            setcover_label.setPixmap(self.placeholder_pixmap.scaled(45, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        layout.addWidget(setcover_label)
+        
+        # 4. Quantità
+        qty_label = QLabel(f"<b>x{quantity or 0}</b>")
+        qty_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        qty_label.setFixedWidth(30)
+        layout.addWidget(qty_label)
+        
+        widget.setLayout(layout)
+        return widget
+
+    def position_search_popup(self):
+        """Posiziona il popup sotto la barra di ricerca."""
+        # Trova la posizione globale dell'angolo in basso a sinistra della barra
+        pos = self.collection_search_input.mapToGlobal(QPoint(0, self.collection_search_input.height()))
+        self.search_popup.move(pos)
+        self.search_popup.setFixedWidth(self.collection_search_input.width() + 100) # Un po' più largo
+        self.search_popup.adjustSize() # Adegua altezza
+
+    def on_search_item_clicked(self, item: QListWidgetItem):
+        """Chiamato quando si clicca un item nel popup."""
+        card_id = item.data(Qt.UserRole)
+        if card_id:
+            self.search_popup.hide()
+            self.open_card_details_by_id(card_id)
+
+    def open_card_details_by_id(self, card_id: int):
+        """Apre il dialog dei dettagli (senza bisogno di un evento click)."""
+        try:
+            dialog = CollectionCardDialog(card_id, self.db_manager, self)
+            dialog.exec_()
+        except Exception as e:
+            print(f"❌ Errore durante l'apertura del CollectionCardDialog (da ricerca): {e}")
+            import traceback
+            traceback.print_exc()
+
+
+
+
+
+    def apply_collection_filters(self):
+        """Applica i filtri di possesso/rarità."""
+        ownership_filter = self.collection_ownership_filter.currentData()
+        rarity_filter = self.collection_rarity_filter.currentData()
+        
+        for set_code, set_data in self.collection_card_widgets.items():
+            widgets = set_data.get('widgets', [])
+            
+            for widget, card_name, rarity, quantity, card_number in widgets:
+                show = True
+                
+                # Filtro ricerca (RIMOSSO)
+                # if search_text and search_text not in card_name.lower():
+                #    show = False
+                
                 
                 # Filtro possesso
                 if show and ownership_filter != "all":
@@ -891,44 +1159,3 @@ class CollectionTab(QWidget):
                         show = False
                 
                 widget.setVisible(show)
-
-    def load_card_image_async(self, image_url: str, target_label: QLabel, scale_w: int, scale_h: int):
-        """Carica un'immagine asincrona."""
-        if not image_url:
-            target_label.setPixmap(self.placeholder_pixmap.scaled(scale_w, scale_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            return
-
-        pixmap = self.image_cache.get(image_url)
-        if pixmap:
-            target_label.setPixmap(pixmap.scaled(scale_w, scale_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            return
-        
-        target_label.setPixmap(self.placeholder_pixmap.scaled(scale_w, scale_h, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        
-        worker = ImageDownloaderWorker(image_url, target_label)
-        worker.signals.finished.connect(self.on_image_loaded)
-        worker.signals.error.connect(self.on_image_load_error)
-        self.image_loader_pool.start(worker)
-
-    @pyqtSlot(bytes, str, QLabel)
-    def on_image_loaded(self, image_data: bytes, image_url: str, target_label: QLabel):
-        """Slot per immagine caricata."""
-        try:
-            pixmap = QPixmap()
-            pixmap.loadFromData(image_data)
-            if pixmap.isNull():
-                raise Exception("Impossibile caricare QPixmap")
-
-            scaled_pixmap = pixmap.scaled(target_label.width(), target_label.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.image_cache.put(image_url, scaled_pixmap)
-            
-            if target_label and target_label.isVisible():
-                target_label.setPixmap(scaled_pixmap)
-                
-        except Exception as e:
-            print(f"❌ Errore on_image_loaded: {e}")
-
-    @pyqtSlot(str, str, QLabel)
-    def on_image_load_error(self, error_msg: str, image_url: str, target_label: QLabel):
-        """Slot per errore caricamento."""
-        pass # Lascia il segnaposto

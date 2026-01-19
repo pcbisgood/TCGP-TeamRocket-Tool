@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - TCGP Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e1f22 0%, #2b2d31 100%);
+            color: #e4e4e7;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .login-card {
+            background: #1e1f22;
+            border-radius: 16px;
+            padding: 48px 40px;
+            border: 1px solid #3a3c42;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 16px;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 8px rgba(244, 197, 66, 0.3));
+        }
+
+        h1 {
+            color: #f4c542;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #a1a1aa;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .description {
+            text-align: center;
+            color: #71717a;
+            font-size: 0.9rem;
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+
+        .error-alert {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .error-alert .icon {
+            color: #ef4444;
+            font-size: 1.2rem;
+        }
+
+        .error-alert .message {
+            color: #fca5a5;
+            font-size: 0.9rem;
+            flex: 1;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            color: #a1a1aa;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 16px;
+            background: #2b2d31;
+            border: 2px solid #3a3c42;
+            border-radius: 10px;
+            color: #e4e4e7;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #f4c542;
+            background: #313338;
+            box-shadow: 0 0 0 3px rgba(244, 197, 66, 0.1);
+        }
+
+        input[type="password"]::placeholder {
+            color: #52525b;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #f4c542 0%, #e6b53a 100%);
+            color: #1e1f22;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(244, 197, 66, 0.3);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(244, 197, 66, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            color: #52525b;
+            font-size: 0.85rem;
+        }
+
+        .footer a {
+            color: #71717a;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer a:hover {
+            color: #f4c542;
+        }
+
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 32px 24px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .logo-icon {
+                width: 64px;
+                height: 64px;
+            }
+        }
+
+        /* Animazione di ingresso */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-container {
+            animation: fadeInUp 0.5s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <!-- Logo Section -->
+            <div class="logo-section">
+                <img src="/rarity_icon/icon.png" alt="TCGP Icon" class="logo-icon">
+                <h1>TCGP Collection</h1>
+                <p class="subtitle">Team Rocket Tool</p>
+            </div>
+
+            <!-- Description -->
+            <p class="description">
+                Enter your password to access the collection manager
+            </p>
+
+            <!-- Error Alert -->
+            {% if error %}
+            <div class="error-alert">
+                <span class="icon">⚠️</span>
+                <span class="message">{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Login Form -->
+            <form method="POST">
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password"
+                        name="password" 
+                        placeholder="Enter your password"
+                        autocomplete="current-password"
+                        autofocus
+                        required
+                    >
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    🔓 Unlock Collection
+                </button>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Protected by Cloudflare Tunnel</p>
+        </div>
+    </div>
+</body>
+</html>

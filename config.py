@@ -14,6 +14,8 @@ import json
 from dotenv import load_dotenv
 
 
+from core.translations import t
+
 # Carica variabili d'ambiente
 load_dotenv()
 
@@ -21,6 +23,40 @@ load_dotenv()
 # PERCORSI E RISORSE - DEFINIZIONE APPDATA
 # ============================================================================
     
+def create_default_settings():
+    """Crea il file settings.json di default se non esiste."""
+    
+    if not os.path.exists(SETTINGS_FILE):
+        print(t("config.settings_not_found", file=SETTINGS_FILE))
+        
+        default_settings = {
+            "token": "",
+            "selected_channel_ids": [], # <-- NUOVA CHIAVE: lista di ID interi
+            "channel_configs": [], # <-- Mantenuta per retrocompatibilità in load_settings
+            "autostart": False,
+            "minimize_to_tray": True,
+            "dark_theme": True,
+            "language": "en",
+            "selected_rarities": [],
+            "last_updated": "",
+            "bot_folder": "",        
+            "discord_notifications": False,
+            "notification_channel": ""
+        }
+        
+        try:
+            # Assicurati che la cartella esista
+            os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+            
+            # Scrivi il file JSON
+            with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(default_settings, f, indent=4, ensure_ascii=False)
+                
+        except Exception as e:
+            print(t("config.settings_creation_error", e=e))
+            # L'app potrebbe non avviarsi correttamente, ma è meglio che crashare qui.
+
+
 
 #def get_resource_path(relative_path):
 #    """
@@ -177,17 +213,17 @@ MATCHING_THRESHOLDS = {
 # ============================================================================
 
 RARITY_DATA = {
-    'Common': os.path.join("gui", "rarity_icon", "diamond_1.png"),
-    'Uncommon': os.path.join("gui", "rarity_icon", "diamond_2.png"),
-    'Rare': os.path.join("gui", "rarity_icon", "diamond_3.png"),
-    'Double Rare': os.path.join("gui", "rarity_icon", "diamond_4.png"),
-    'Art Rare': os.path.join("gui", "rarity_icon", "star_1.png"),
-    'Super Rare': os.path.join("gui", "rarity_icon", "star_2.png"),
-    'Special Art Rare': os.path.join("gui", "rarity_icon", "rainbow_star.png"),
-    'Immersive Rare': os.path.join("gui", "rarity_icon", "star_3.png"),
-    'Shiny': os.path.join("gui", "rarity_icon", "shiny_1.png"),
-    'Shiny Super Rare': os.path.join("gui", "rarity_icon", "shiny_2.png"),
-    'Crown Rare': os.path.join("gui", "rarity_icon", "crown.png"),
+    'Common': os.path.join("gui", "diamond_1.png"),
+    'Uncommon': os.path.join("gui", "diamond_2.png"),
+    'Rare': os.path.join("gui", "diamond_3.png"),
+    'Double Rare': os.path.join("gui", "diamond_4.png"),
+    'Art Rare': os.path.join("gui", "star_1.png"),
+    'Super Rare': os.path.join("gui", "star_2.png"),
+    'Special Art Rare': os.path.join("gui", "rainbow_star.png"),
+    'Immersive Rare': os.path.join("gui", "star_3.png"),
+    'Shiny': os.path.join("gui", "shiny_1.png"),
+    'Shiny Super Rare': os.path.join("gui", "shiny_2.png"),
+    'Crown Rare': os.path.join("gui", "crown.png"),
 }
 
 
@@ -337,7 +373,7 @@ def load_settings():
             with open(SETTINGS_FILE, 'r') as f:
                 return json.load(f)
     except Exception as e:
-        print(f"Warning: Error loading settings: {e}")
+        print(t("config.settings_loading_warning", e=e))
     
     # Valori di default
     return {
@@ -362,7 +398,7 @@ def save_settings(settings):
             json.dump(settings, f, indent=4)
         return True
     except Exception as e:
-        print(f"Error: Cannot save settings: {e}")
+        print(t("config.settings_saving_error", e=e))
         return False
 
 
@@ -374,13 +410,13 @@ def save_settings(settings):
 def print_paths_info():
     """Stampa i percorsi per debug."""
     print("\n" + "="*70)
-    print("APPDATA PATHS INFO")
+    print(t("config.paths_info_title"))
     print("="*70)
-    print(f"App Data Dir:      {APP_DATA_DIR}")
-    print(f"Settings File:     {SETTINGS_FILE}")
-    print(f"Database:          {DB_FILENAME}")
-    print(f"Accounts Dir:      {ACCOUNTS_DIR}")
+    print(f"{t('config.app_data_dir')}      {APP_DATA_DIR}")
+    print(f"{t('config.settings_file')}     {SETTINGS_FILE}")
+    print(f"{t('config.database')}          {DB_FILENAME}")
+    print(f"{t('config.accounts_dir')}      {ACCOUNTS_DIR}")
 #    print(f"TCG Images Dir:    {TCG_IMAGES_DIR}")
-    print(f"Cache Dir:         {CACHE_DIR}")
-    print(f"Logs Dir:          {LOG_DIR}")
+    print(f"{t('config.cache_dir')}         {CACHE_DIR}")
+    print(f"{t('config.logs_dir')}          {LOG_DIR}")
     print("="*70 + "\n")

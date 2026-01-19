@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ set_name }} - Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #2b2d31;
+            color: #e4e4e7;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #f4c542;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .back-btn:hover {
+            opacity: 0.8;
+        }
+
+        .set-header {
+            background: #1e1f22;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid #3a3c42;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .set-cover-large {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            border: 2px solid #f4c542;
+            border-radius: 12px;
+            padding: 8px;
+            flex-shrink: 0;
+        }
+
+        .set-info {
+            flex: 1;
+        }
+
+        .set-info h1 {
+            font-size: 1.8rem;
+            color: #e4e4e7;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .set-info p {
+            color: #a1a1aa;
+            margin: 6px 0;
+            font-size: 0.95rem;
+        }
+
+        .set-info strong {
+            color: #f4c542;
+            font-weight: 600;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: #1e1f22;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #3a3c42;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: 1px solid #3a3c42;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            background: #2b2d31;
+            color: #e4e4e7;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background: #313338;
+            border-color: #52525b;
+        }
+
+        .btn.active {
+            background: #f4c542;
+            color: #1e1f22;
+            border-color: #f4c542;
+        }
+
+        .btn.success {
+            border-color: #22c55e;
+        }
+
+        .btn.success.active {
+            background: #22c55e;
+            color: #1e1f22;
+        }
+
+        .btn.warning {
+            border-color: #f59e0b;
+        }
+
+        .btn.warning.active {
+            background: #f59e0b;
+            color: #1e1f22;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .card-item {
+            background: transparent;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+
+        .card-item:hover {
+            transform: translateY(-4px);
+        }
+
+        .card-item a {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .card-image-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 2/3;
+            margin-bottom: 8px;
+        }
+
+        .card-image {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .wishlist-btn {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 32px;
+            height: 32px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #555;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 2;
+        }
+
+        .wishlist-btn:hover {
+            background: rgba(231, 76, 60, 0.8);
+            border-color: #c0392b;
+        }
+
+        .wishlist-btn.active {
+            background: rgba(231, 76, 60, 0.9);
+            border-color: #c0392b;
+        }
+
+        .quantity-badge {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            background: #f4c542;
+            color: #1e1f22;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            z-index: 2;
+        }
+
+        .card-info {
+            text-align: center;
+        }
+
+        .card-name {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 0.8rem;
+            color: #e4e4e7;
+            line-height: 1.3;
+            min-height: 32px;
+        }
+
+        .card-rarity {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 24px;
+        }
+
+        .card-rarity img {
+            height: 20px;
+            width: auto;
+        }
+
+        .card-rarity-text {
+            color: #a1a1aa;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .card-missing {
+            opacity: 0.4;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: #1e1f22;
+            border-radius: 12px;
+            border: 1px solid #3a3c42;
+            color: #71717a;
+        }
+
+        .empty-state h2 {
+            color: #a1a1aa;
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .set-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .set-cover-large {
+                width: 100px;
+                height: 100px;
+            }
+
+            .set-info h1 {
+                font-size: 1.4rem;
+            }
+
+            .cards-grid {
+                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">
+            ← Back to Sets
+        </a>
+
+        <div class="set-header">
+            {% if cover_blob %}
+            <img class="set-cover-large" src="data:image/png;base64,{{ cover_blob }}" alt="{{ set_name }}">
+            {% else %}
+            <div class="set-cover-large"></div>
+            {% endif %}
+            
+            <div class="set-info">
+                <h1>{{ set_code }} - {{ set_name }}</h1>
+                <p><strong>Released:</strong> {{ release_date }}</p>
+                <p><strong>Total Cards:</strong> {{ total_cards }}</p>
+            </div>
+        </div>
+
+        <div class="filter-buttons">
+            <a href="/set/{{ set_code }}?filter=all" 
+               class="btn {{ 'active' if filter_type == 'all' else '' }}">
+                All
+            </a>
+            <a href="/set/{{ set_code }}?filter=owned" 
+               class="btn success {{ 'active' if filter_type == 'owned' else '' }}">
+                Owned
+            </a>
+            <a href="/set/{{ set_code }}?filter=missing" 
+               class="btn warning {{ 'active' if filter_type == 'missing' else '' }}">
+                Missing
+            </a>
+        </div>
+
+        <div class="cards-grid">
+            {% for card in cards %}
+            <div class="card-item {% if not card.quantity or card.quantity == 0 %}card-missing{% endif %}">
+                <a href="/card/{{ card.id }}">
+                    <div class="card-image-container">
+                        {% if card.thumbnail_blob %}
+                        <img class="card-image" 
+                             src="data:image/png;base64,{{ card.thumbnail_blob }}" 
+                             alt="{{ card.card_name }}"
+                             loading="lazy">
+                        {% else %}
+                        <div class="card-image"></div>
+                        {% endif %}
+                        
+                       <!-- Wishlist Button -->
+                        <div class="wishlist-btn {% if card.in_wishlist %}active{% endif %}" data-card-id="{{ card.id }}">
+                            {% if card.in_wishlist %}❤️{% else %}🤍{% endif %}
+                        </div>
+                        
+                        <!-- Quantity Badge -->
+                        {% if card.quantity and card.quantity > 0 %}
+                        <div class="quantity-badge">x{{ card.quantity }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="card-info">
+                        <p class="card-name">#{{ card.card_number }} {{ card.card_name }}</p>
+                        <div class="card-rarity">
+                            {% if card.rarity == 'Common' %}
+                            <img src="/rarity_icon/diamond_1.png" alt="Common" title="Common">
+                            {% elif card.rarity == 'Uncommon' %}
+                            <img src="/rarity_icon/diamond_2.png" alt="Uncommon" title="Uncommon">
+                            {% elif card.rarity == 'Rare' %}
+                            <img src="/rarity_icon/diamond_3.png" alt="Rare" title="Rare">
+                            {% elif card.rarity == 'Double Rare' %}
+                            <img src="/rarity_icon/diamond_4.png" alt="Double Rare" title="Double Rare">
+                            {% elif card.rarity == 'Art Rare' %}
+                            <img src="/rarity_icon/star_1.png" alt="Art Rare" title="Art Rare">
+                            {% elif card.rarity == 'Super Rare' %}
+                            <img src="/rarity_icon/star_2.png" alt="Super Rare" title="Super Rare">
+                            {% elif card.rarity == 'Special Art Rare' %}
+                            <img src="/rarity_icon/rainbow_star.png" alt="Special Art Rare" title="Special Art Rare">
+                            {% elif card.rarity == 'Immersive Rare' %}
+                            <img src="/rarity_icon/star_3.png" alt="Immersive Rare" title="Immersive Rare">
+                            {% elif card.rarity == 'Shiny' %}
+                            <img src="/rarity_icon/shiny_1.png" alt="Shiny" title="Shiny">
+                            {% elif card.rarity == 'Shiny Super Rare' %}
+                            <img src="/rarity_icon/shiny_2.png" alt="Shiny Super Rare" title="Shiny Super Rare">
+                            {% elif card.rarity == 'Crown Rare' %}
+                            <img src="/rarity_icon/crown.png" alt="Crown Rare" title="Crown Rare">
+                            {% else %}
+                            <span class="card-rarity-text">{{ card.rarity }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if not cards %}
+        <div class="empty-state">
+            <h2>No cards found</h2>
+            <p>Try changing the filter or check back later</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Aggiungi event listener a tutti i bottoni wishlist
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.wishlist-btn').forEach(btn => {
+                btn.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    
+                    const cardId = this.dataset.cardId;
+                    const element = this;
+                    
+                    // TODO: Implementa la chiamata AJAX al server
+                    fetch('/api/wishlist/toggle', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ card_id: cardId })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (data.in_wishlist) {
+                                element.classList.add('active');
+                                element.textContent = '❤️';
+                            } else {
+                                element.classList.remove('active');
+                                element.textContent = '🤍';
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error toggling wishlist:', error);
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>

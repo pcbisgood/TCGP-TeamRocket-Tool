@@ -36,7 +36,7 @@ from config import (
     REQUEST_TIMEOUT,
     TCG_IMAGES_DIR
 )
-
+print(TCG_IMAGES_DIR)
 # Import database
 from .database import DatabaseManager
 
@@ -319,24 +319,20 @@ class TCGPocketScraper:
             self.log_callback(f"⚠️ Errore download immagine: {e}")
             return None
     
-    async def download_set_cover(self, cover_url, set_folder):
-        """Scarica la copertina del set (Async)."""
+    async def download_set_cover_bytes(self, cover_url):
+        """Scarica i bytes della copertina del set (Async)."""
         if not cover_url:
             return None
         
         try:
-            cover_path = os.path.join(set_folder, "cover.webp")
-            
-            if os.path.exists(cover_path):
-                return cover_path
-            
+            # Usiamo get_bytes che gestisce i retry
             image_bytes = await self.get_bytes(cover_url)
             
-            os.makedirs(set_folder, exist_ok=True)
-            with open(cover_path, 'wb') as f:
-                f.write(image_bytes)
+            if image_bytes:
+                self.log_callback(f"🖼️ Scaricati {len(image_bytes)} bytes per la cover.")
             
-            return cover_path
+            return image_bytes
+            
         except Exception as e:
             self.log_callback(f"⚠️ Errore download cover: {e}")
             return None
@@ -349,17 +345,19 @@ class TCGPocketScraper:
         """Salva un set nel database (Sincrono)."""
         try:
             with self.db_lock:
+                # ✅ MODIFICATO: Inserita cover_image_blob
                 self.db_manager.cursor.execute("""
                     INSERT OR REPLACE INTO sets 
-                    (set_code, set_name, url, release_date, total_cards, cover_image_path)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (set_code, set_name, url, release_date, total_cards, cover_image_path, cover_image_blob)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     set_data['code'],
                     set_data['name'],
                     set_data['url'],
                     set_data.get('release_date', ''),
                     set_data.get('total_cards', 0),
-                    set_data.get('cover_path', None)
+                    set_data.get('cover_path', None),
+                    set_data.get('cover_image_blob', None) # <- NUOVO BLOB
                 ))
                 self.db_manager.conn.commit()
         except Exception as e:
@@ -550,45 +548,78 @@ class TCGPocketScraper:
         elif level == 'warn':
             self.log_callback(f"⚠️ {message}")
         elif 'progress' in message.lower() or 'completat' in message.lower():
-            # Log solo milestone di progresso
             self.log_callback(f"📊 {message}")
-        # Altrimenti, silenzia log routinari
 
-
-    # In scraper.py
 
     async def process_set(self, set_data, download_images=True): # download_images ora è ignorato
         """
         Elabora un intero set (Async).
-        MODIFICATO: Controlla gli hash prima di processare le carte
-        per evitare download e scritture inutili.
+        MODIFICATO: Aggiunta logica di download del BLOB e controllo hash.
         """
         loop = asyncio.get_running_loop()
         set_code = set_data['code']
         
         try:
-            # 1. Salva i dati del SET (è veloce, 'INSERT OR REPLACE' va bene qui)
+            # 1. Prendi la HASH/URL della cover ESISTENTE dal DB
+            db_cover_url = None
+            try:
+                with self.db_lock:
+                    cursor = self.db_manager.conn.cursor()
+                    # Recuperiamo l'URL precedente per il check
+                    cursor.execute("SELECT url FROM sets WHERE set_code = ?", (set_code,))
+                    result = cursor.fetchone()
+                    if result:
+                        db_cover_url = result[0]
+            except Exception as e:
+                self.log_callback(f"⚠️ Errore lettura DB per cover {set_code}: {e}")
+
+            cover_image_blob = None
+            api_cover_url = set_data.get('cover_image_url')
+            
+            # 2. Controlla se la cover è cambiata (URL diverso) o mancante
+            if api_cover_url:
+                if api_cover_url != db_cover_url:
+                    self.log_callback(f"🖼️ Cover set {set_code} cambiata/nuova. Download...")
+                    cover_image_blob = await self.download_set_cover_bytes(api_cover_url)
+                else:
+                    # Se l'URL è lo stesso, proviamo a recuperare il BLOB esistente
+                    # per assicurarci che non venga sovrascritto con NULL se non lo scarichiamo
+                    # (Anche se INSERT OR REPLACE dovrebbe mantenere il BLOB esistente se non fornito)
+                    try:
+                        with self.db_lock:
+                            cursor = self.db_manager.conn.cursor()
+                            cursor.execute("SELECT cover_image_blob FROM sets WHERE set_code = ?", (set_code,))
+                            result = cursor.fetchone()
+                            if result and result[0]:
+                                cover_image_blob = result[0]
+                    except Exception as e:
+                        self.log_callback(f"⚠️ Errore recupero BLOB esistente: {e}")
+
+
+            # 3. Prepara i dati del SET per il salvataggio
             set_data_to_save = {
                 'code': set_data.get('code'),
                 'name': set_data.get('name'),
-                'url': set_data.get('url'),
+                'url': api_cover_url, # Usiamo l'URL della cover come 'hash' implicito
                 'release_date': set_data.get('release_date'),
                 'total_cards': set_data.get('total_cards'),
-                'cover_path': set_data.get('cover_image_url') 
+                'cover_path': set_data.get('cover_image_url'), 
+                'cover_image_blob': cover_image_blob # <- PASSAGGIO DEL BLOB
             }
+            # Salvataggio del SET
             await loop.run_in_executor(None, self.save_set_to_db, set_data_to_save)
             
-            # 2. Prendi le carte dall'API JSON
+            # ================================================================
+            # INIZIO LOGICA CARTE
+            # ================================================================
+
+            # 4. Prendi le carte dall'API JSON
             cards_json = await self.get_cards_from_set(set_code)
             if not cards_json:
                 self.log_callback(f"Nessuna carta trovata per set {set_code}")
                 return 0
 
-            # ================================================================
-            # ✅ LOGICA "SMART UPDATE"
-            # ================================================================
-            
-            # 3. Prendi gli hash delle carte ESISTENTI dal DB
+            # 5. Prendi gli hash delle carte ESISTENTI dal DB
             db_cards_map = {}
             try:
                 with self.db_lock:
@@ -599,7 +630,7 @@ class TCGPocketScraper:
             except Exception as e:
                 self.log_callback(f"⚠️ Errore lettura hash DB per {set_code}: {e}")
 
-            # 4. Dividi le carte in "da processare" e "da saltare"
+            # 6. Dividi le carte in "da processare" e "da saltare" (Smart Update)
             cards_to_process = [] # Nuove o modificate (hash diverso)
             cards_to_skip = []    # Identiche (hash uguale)
 
@@ -623,15 +654,15 @@ class TCGPocketScraper:
                 self.log_callback(f"✅ Set {set_code} già sincronizzato.")
                 return 0 # Nessuna carta da processare
 
-            # ================================================================
-            
-            # 5. Scarica i bytes SOLO per le carte nuove/modificate
+            # 7. Scarica i bytes SOLO per le carte nuove/modificate
             self.log_callback(f"🖼️ Download di {len(cards_to_process)} immagini per {set_code}...")
             
             card_semaphore = asyncio.Semaphore(CARD_CONCURRENCY)
             
             async def process_card_wrapper(card_json):
                 async with card_semaphore:
+                    # ✅ AGGIUNGI set_code prima di processare
+                    card_json['set_code'] = set_code 
                     return await self.process_card(card_json)
 
             tasks = [process_card_wrapper(card) for card in cards_to_process]
@@ -639,7 +670,7 @@ class TCGPocketScraper:
             
             cards_with_bytes = [card for card in processed_cards_list if card is not None]
 
-            # 6. Salva SOLO le carte nuove/modificate nel DB
+            # 8. Salva SOLO le carte nuove/modificate nel DB
             if cards_with_bytes:
                 await loop.run_in_executor(None, self.save_cards_to_db_batch, cards_with_bytes)
             

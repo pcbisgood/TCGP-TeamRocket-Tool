@@ -12,7 +12,7 @@ import time
 import re
 from datetime import datetime
 from threading import Lock, Semaphore
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import xml.etree.ElementTree as ET
 import io
@@ -50,16 +50,16 @@ class TradeMonitorClient(discord.Client):
     """Client Discord per monitorare i trade e scansionare le carte."""
     
     def __init__(self, *, intents: discord.Intents, log_callback, progress_callback, 
-                 trade_callback, status_callback, card_found_callback):
+                 trade_callback, status_callback, card_found_callback, 
+                 channel_ids: List[int], channels_ready_callback: Callable):
         super().__init__(intents=intents)
         self.log_callback = log_callback
         self.progress_callback = progress_callback
         self.trade_callback = trade_callback
         self.status_callback = status_callback
         self.card_found_callback = card_found_callback
-        
-        # ❌ RIMOSSO: self.trade_log = []
-        # ❌ RIMOSSO: self.processed_message_ids = set()
+        self.channel_ids = channel_ids # <-- SALVATA LA LISTA
+        self.channels_ready_callback = channels_ready_callback
         
         self.initial_scan_done = False
         self.session = None
@@ -96,6 +96,57 @@ class TradeMonitorClient(discord.Client):
 
         self.db_lock = Lock()
 
+
+    def _get_channels(self) -> List[discord.TextChannel]:
+            """Recupera tutti gli oggetti canale validi DALLA LISTA channel_ids."""
+            channels = []
+            for channel_id in self.channel_ids:
+                # Assicurati che l'ID sia un intero prima di passarlo al bot
+                if isinstance(channel_id, str):
+                    try: channel_id = int(channel_id)
+                    except ValueError: continue
+                    
+                channel = self.get_channel(channel_id)
+                if channel and isinstance(channel, discord.TextChannel):
+                    channels.append(channel)
+                elif channel_id != 0: 
+                    self.log_callback(f"❌ Canale ID '{channel_id}' non trovato o non è un canale di testo.")
+            return channels
+
+
+    def _insert_or_update_inventory(self, account_id, card_id, quantity=1):
+        """
+        Inserisce o aggiorna il conteggio delle carte nell'inventario.
+        CORRETTO: Rimossa la colonna 'last_updated' da account_inventory.
+        """
+        if not account_id or not card_id:
+            return
+
+        try:
+            with self.db_lock:
+                cursor = self.db_conn.cursor()
+                
+                # 1. Tenta di inserire (nuovo record)
+                # account_id qui è il Device ID (PK)
+                cursor.execute("""
+                    INSERT OR IGNORE INTO account_inventory (account_id, card_id, quantity) 
+                    VALUES (?, ?, ?)
+                """, (account_id, card_id, quantity))
+                
+                # 2. Aggiorna se già esistente (aumenta la quantità)
+                cursor.execute("""
+                    UPDATE account_inventory 
+                    SET quantity = quantity + ?
+                    WHERE account_id = ? AND card_id = ?
+                """, (quantity, account_id, card_id))
+                
+                self.db_conn.commit()
+                
+        except Exception as e:
+            self.log_callback(f"❌ Errore aggiornamento inventario per {account_id}: {e}")
+
+
+
     def _create_screenshot_thumbnail(self, image_bytes):
         """Crea un thumbnail 60x60 in-memory dallo screenshot."""
         if not image_bytes:
@@ -116,75 +167,72 @@ class TradeMonitorClient(discord.Client):
             return None
 
 
+    # discord_client.py (dentro TradeMonitorClient)
     async def recover_missing_cards(self, trade_list: List[Dict]):
         """
-        Recupera le carte mancanti per messaggi che hanno già gli allegati scaricati.
-
-        Utile per:
-        - Messaggi nel log ma senza carte nel DB
-        - Scansioni fallite precedentemente
-        - Aggiornamenti dell'algoritmo di riconoscimento
+        Tenta di recuperare le schede non trovate o non scansionate
+        per i trade storici riscaricando l'immagine dall'URL.
         """
-
-        if not trade_list:
-            return
-
-        self.log_callback(f"🔍 Recupero carte per {len(trade_list)} messaggi...")
-
         processed_count = 0
         error_count = 0
 
         for i, trade_data in enumerate(trade_list, 1):
-            try:
-                # Mostra progresso
-                percent = int((i / len(trade_list)) * 100) if len(trade_list) > 0 else 0
-                status = f"Recupero {i}/{len(trade_list)}"
-                self.progress_callback({'percent': percent, 'status': status})
+            
+            # Assicurati che trade_data sia un dict e non una Row SQLite
+            if not isinstance(trade_data, dict):
+                trade_data = dict(trade_data)
                 
-                image_path = trade_data.get('image_path')
-                
-                # Verifica che l'immagine esista
-                if not image_path or not os.path.exists(image_path):
-                    self.log_callback(f"⚠️ [{i}/{len(trade_list)}] Immagine non trovata: {image_path}")
-                    error_count += 1
-                    continue
-                
-                # Scansiona l'immagine per riconoscere le carte
-                self.log_callback(f"🔍 [{i}/{len(trade_list)}] Scansione: {os.path.basename(image_path)}")
-                
-                await self.scan_image_for_cards(trade_data)
-                
-                processed_count += 1
-                
-                # Piccola pausa per evitare sovraccarico
-                #await asyncio.sleep(0.2)
-                
-            except Exception as e:
-                self.log_callback(f"❌ Errore recupero messaggio {i}: {e}")
+            image_url = trade_data.get('image_url')
+            message_id = trade_data.get('message_id')
+            
+            # 💥 CORREZIONE CRUCIALE: Assicurati che l'ID PK sia disponibile
+            # Quando recuperiamo dal DB, 'account_id' è già la PK salvata in precedenza.
+            account_id_pk = trade_data.get('account_id') 
+            if not account_id_pk:
+                self.log_callback(f"⚠️ [{i}/{len(trade_list)}] ID account (PK) mancante per {message_id}.")
                 error_count += 1
                 continue
 
+            if not image_url:
+                self.log_callback(f"⚠️ [{i}/{len(trade_list)}] URL immagine non valido per {message_id}.")
+                error_count += 1
+                continue
+
+            self.log_callback(f"⬇️ [{i}/{len(trade_list)}] Riscarico immagine per {message_id}")
+
+            # Passo 1: Download dell'immagine completa in memoria (bytes)
+            image_bytes = await self._download_attachment_to_bytes(image_url)
+            
+            if not image_bytes:
+                # Se il download fallisce, non possiamo scansionare
+                self.log_callback(f"⚠️ [{i}/{len(trade_list)}] Immagine non scaricata da URL: {image_url}")
+                error_count += 1
+                
+                # OPTIONAL: Aggiorna lo stato su "Errore Download"
+                try:
+                    cursor = self.db_conn.cursor()
+                    cursor.execute("UPDATE trades SET scan_status = 2 WHERE message_id = ?", (message_id,))
+                    self.db_conn.commit()
+                except Exception as e:
+                    self.log_callback(f"❌ Errore aggiornamento stato DB per {message_id}: {e}")
+                
+                continue
+
+            # Passo 2: Scansione utilizzando i byte scaricati
+            try:
+                # 💥 CORREZIONE: Aggiungiamo l'ID PK al trade_data, come se venisse da process_message_batch_fast.
+                trade_data['account_id'] = account_id_pk
+                trade_data['account_name'] = trade_data.get('account_name', account_id_pk)
+                
+                # Passa i byte scaricati direttamente alla funzione di scansione
+                await self.scan_image_for_cards(trade_data, image_bytes)
+                processed_count += 1
+            except Exception as e:
+                self.log_callback(f"❌ Errore scansione recupero [{i}/{len(trade_list)}] per {message_id}: {e}")
+                error_count += 1
+
         self.log_callback(f"✅ Recupero completato: {processed_count} elaborati, {error_count} errori")
 
-
-    def update_account_credentials(self, account_name, device_account, device_password):
-        """Aggiorna le credenziali dell'account nel DB."""
-        try:
-            with self.db_lock:
-                # Assicura che l'account esista
-                cursor = self.db_conn.cursor()
-                cursor.execute("INSERT OR IGNORE INTO accounts (account_name) VALUES (?)", (account_name,))
-                
-                # Aggiorna credenziali
-                cursor.execute("""
-                    UPDATE accounts 
-                    SET device_account = ?, device_password = ?, last_updated = CURRENT_TIMESTAMP
-                    WHERE account_name = ?
-                """, (device_account, device_password, account_name))
-                
-                self.db_conn.commit()
-        except Exception as e:
-            self.log_callback(f"⚠️ Errore aggiornamento credenziali {account_name}: {e}")
 
     async def setup_hook(self):
         """Setup del client."""
@@ -229,7 +277,15 @@ class TradeMonitorClient(discord.Client):
         
         self.log_callback("✅ " + t("discord_bot.connected_as", name=self.user.name))
         self.status_callback(t("discord_bot.status_connected"))
+        channels_data = {}
+        for guild in self.guilds:
+            for channel in guild.text_channels:
+                # Controlla se il bot può leggere la cronologia per quel canale
+                if channel.permissions_for(guild.me).read_message_history:
+                    channels_data[channel.id] = channel.name
         
+        # Invia la lista alla UI (QThread) per popolare la selezione
+        self.channels_ready_callback(channels_data)        
         cursor = self.db_conn.cursor()
         
         try:
@@ -258,12 +314,22 @@ class TradeMonitorClient(discord.Client):
                 except Exception as e:
                     self.log_callback(f"⚠️ Errore caricamento trade recenti: {e}")
 
-                # 2. RECUPERA TRADE FALLITI (scan_status = 0 o 2)
                 try:
-                    cursor.execute("SELECT * FROM trades WHERE scan_status = 0 OR scan_status = 2")
+                    self.log_callback("🚀 Inizio scansione storica completa...")
+                    cursor.execute("""
+                        SELECT * FROM trades 
+                        WHERE (scan_status = 0 OR scan_status = 2) 
+                        AND image_url IS NOT NULL     -- ✅ Recupera solo quelli con URL
+                        AND image_url != ''           -- ✅ Assicurati che l'URL non sia vuoto
+                    """)
                     trades_to_reprocess = cursor.fetchall()
+                    
+                    self.log_callback(f"🔍 Recupero carte per {len(trades_to_reprocess)} messaggi...")
                     if trades_to_reprocess:
-                        await self.recover_missing_cards([dict(row) for row in trades_to_reprocess])
+                        # Converti da tuple SQLite a dicts per un uso più semplice
+                        trade_dicts = [dict(row) for row in trades_to_reprocess]
+                        await self.recover_missing_cards(trade_dicts)
+                        
                 except Exception as e:
                     self.log_callback(f"⚠️ Errore recupero trade: {e}")
 
@@ -291,71 +357,68 @@ class TradeMonitorClient(discord.Client):
         self.log_callback("👂 Inizio monitoraggio messaggi in tempo reale...")
 
 
-
-
-    def _get_or_create_account(self, account_name, device_account=None, device_password=None):
+    def _get_or_create_account(self, display_name: str, pk_id: Optional[str] = None, device_password: Optional[str] = None):
         """
         Ottiene o crea un account nel database (Thread-safe).
-        MODIFICATO: Aggiorna anche le credenziali se fornite.
+        pk_id: Il Device ID univoco (la chiave primaria da salvare in device_account) estratto da XML.
+        display_name: Il nome file di fallback (timestamp).
+        
+        Se pk_id non è fornito, usa display_name come chiave primaria (FALLBACK).
+        Ritorna la chiave primaria (PK) utilizzata.
         """
-        if not account_name:
+        # 1. Determina la CHIAVE PRIMARIA (PK)
+        final_pk = pk_id if pk_id else display_name
+        
+        if not final_pk:
             return None
+            
         try:
-            # Usiamo un lock per evitare race condition
             with self.db_lock:
                 cursor = self.db_conn.cursor()
                 
-                # 1. Inserisci o ignora (assicura che l'account esista)
-                cursor.execute("INSERT OR IGNORE INTO accounts (account_name) VALUES (?)", (account_name,))
+                # STEP 1: Tenta di Inserire o Ignora.
+                # final_pk viene usato come PK (device_account).
+                # display_name viene usato come account_name (nome di visualizzazione iniziale).
+                cursor.execute("""
+                    INSERT OR IGNORE INTO accounts 
+                    (device_account, account_name, device_password) 
+                    VALUES (?, ?, ?)
+                """, (final_pk, display_name, device_password))
                 
-                # 2. Aggiorna le credenziali se fornite
-                if device_account and device_password:
-                    cursor.execute("""
-                        UPDATE accounts 
-                        SET device_account = ?, device_password = ?, last_updated = CURRENT_TIMESTAMP
-                        WHERE account_name = ?
-                    """, (device_account, device_password, account_name))
+                # STEP 2: Aggiorna i campi (password e nome display) se il record esiste.
+                cursor.execute("""
+                    UPDATE accounts 
+                    SET device_password = ?, 
+                        account_name = ?,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE device_account = ?
+                """, (device_password, display_name, final_pk))
                 
                 self.db_conn.commit()
 
-                # 3. Recupera l'ID
-                cursor.execute("SELECT account_id FROM accounts WHERE account_name = ?", (account_name,))
-                result = cursor.fetchone()
+                return final_pk
                 
-                if result:
-                    return result[0] # Ritorna l'ID
-                return None
         except Exception as e:
-            self.log_callback(f"⚠️ Errore gestione account '{account_name}': {e}")
-            return None
+            self.log_callback(f"⚠️ Errore DB in _get_or_create_account per '{final_pk}': {e}")
+            return final_pk
+        
 
+    # discord_client.py (dentro TradeMonitorClient)
     async def perform_historical_scan_streaming(self):
         """
-        Scansiona i messaggi in STREAMING (uno alla volta).
-        MODIFICATO: Legge XML e Immagine in memoria.
+        Scansiona i messaggi storici in streaming, ciclando su tutti i canali configurati.
         """
         
-        channel_id = int(os.getenv('CHANNEL_ID', '0'))
-        channel = self.get_channel(channel_id)
-        
-        if not channel:
-            self.log_callback("❌ Canale non trovato")
+        channels = self._get_channels()
+        if not channels:
+            self.log_callback("❌ Nessun canale valido configurato per la scansione storica.")
             self.initial_scan_done = True
             return
         
-        # Verifica permessi (invariato)
-        if hasattr(channel, 'guild') and channel.guild:
-            bot_member = channel.guild.get_member(self.user.id)
-            if bot_member:
-                permissions = channel.permissions_for(bot_member)
-                if not permissions.read_message_history:
-                    self.log_callback("❌ Permesso negato: lettura cronologia messaggi")
-                    self.initial_scan_done = True
-                    return
-        
-        # Carica l'ID più vecchio (invariato)
+        # Prepara la cache MAX_ID per tutti i canali (per evitare di scansionare l'intero storico ogni volta)
         try:
             cursor = self.db_conn.cursor()
+            # Ottieni l'ID del messaggio più vecchio da 'trades'
             cursor.execute("SELECT MIN(CAST(message_id AS INTEGER)) FROM trades")
             result = cursor.fetchone()
             oldest_message_id = int(result[0]) if result and result[0] else None
@@ -363,149 +426,174 @@ class TradeMonitorClient(discord.Client):
             self.log_callback(f"⚠️ Errore DB (getting MIN_msg_id): {e}")
             oldest_message_id = None
         
-        try:
-            self.log_callback(f"🚀 Inizio scansione storica...")
-            
-            total_messages = 0
-            processed_messages = 0
-            
-            history_iter = channel.history(
-                limit=None,
-                before=discord.Object(id=oldest_message_id) if oldest_message_id else None,
-                oldest_first=False 
-            )
-            
-            async for message in history_iter:
-                total_messages += 1
-                
-                if SEARCH_STRING not in message.content:
-                    continue
-                
-                # ✅ PASSO 1: ESTRAI I DATI DAL MESSAGGIO
-                try:
-                    trade_data, xml_att, img_att = extract_trade_data_fast(message)
-                    trade_data['message_id'] = message.id
-                except Exception as e:
-                    self.log_callback(f"⚠️ Errore estrazione dati msg {message.id}: {e}")
-                    continue
-                
-                # ================================================================
-                # ✅ PASSO 2: LEGGI ALLEGATI IN MEMORIA
-                # ================================================================
-                account_name = trade_data.get('account_name')
-                trade_data['xml_path'] = None
-                trade_data['image_url'] = None
-                xml_content_bytes = None
-                image_content_bytes = None
-
-                try:
-                    if xml_att:
-                        xml_content_bytes = await xml_att.read()
-                    if img_att:
-                        image_content_bytes = await img_att.read()
-                        trade_data['image_url'] = img_att.url # Salva l'URL
-                except Exception as e:
-                    self.log_callback(f"⚠️ Errore lettura allegati in RAM (Storico): {e}")
-                    continue
-
-                # ================================================================
-                # ✅ GESTIONE XML IN-MEMORIA E SYNC INVENTARIO
-                # ================================================================
-                if xml_content_bytes:
-                    try:
-                        root = ET.fromstring(xml_content_bytes)
-                        data = {child.get('name'): child.text for child in root.findall('string')}
-                        d_acc, d_pass = data.get('deviceAccount'), data.get('devicePassword')
-                        
-                        if d_acc and d_pass:
-                            account_id = self._get_or_create_account(account_name, d_acc, d_pass)
-                            # Esegui il sync (non aspettarlo, lascialo andare in background)
-                            trade_data['xml_path'] = "DB_STORED"
-                    except Exception as e:
-                        self.log_callback(f"⚠️ Errore parsing XML in-memory (Storico): {e}")
-
-                # ================================================================
-                # ✅ GESTIONE IMMAGINE (Thumbnail BLOB)
-                # ================================================================
-                screenshot_thumb_blob = None
-                if image_content_bytes:
-                    # Crea la piccola miniatura da 60x60 per il DB
-                    screenshot_thumb_blob = self._create_screenshot_thumbnail(image_content_bytes)
-                
-                # ================================================================
-                # ✅ PASSO 3: INSERISCI IL TRADE NEL DATABASE
-                # ================================================================
-                try:
-                    account_id = self._get_or_create_account(account_name)
-                    cursor = self.db_conn.cursor()
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO trades 
-                        (message_id, account_id, account_name, xml_path, image_url, 
-                         screenshot_thumbnail_blob, message_link, cards_found_text, scan_status)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        str(trade_data['message_id']),
-                        account_id,
-                        account_name,
-                        trade_data.get('xml_path'),
-                        trade_data.get('image_url'),    # <-- L'URL dello screenshot
-                        screenshot_thumb_blob,          # <-- La miniatura BLOB
-                        trade_data.get('message_link'),
-                        trade_data.get('cards_found_text'),
-                        0 # scan_status = 0 (In attesa)
-                    ))
-                    self.db_conn.commit()
-                    
-                    # Aggiungi alla UI (Tab Bot)
-                    trade_data['screenshot_thumbnail_blob'] = screenshot_thumb_blob
-                    self.trade_callback(trade_data) 
-                    
-                except Exception as e:
-                    self.log_callback(f"⚠️ Errore INSERT trade msg {message.id}: {e}")
-                    continue
-                
-                # ✅ PASSO 4: SCANSIONA IMMAGINE (Passa i bytes completi)
-                if image_content_bytes:
-                    try:
-                        await self.scan_image_for_cards(trade_data, image_content_bytes) 
-                    except Exception as e:
-                        self.log_callback(f"⚠️ Errore scansione immagine: {e}")
-                
-                # Aggiorna progress
-                processed_messages += 1
-                status = f"Scansione storica: {processed_messages} processati"
-                self.progress_callback({'percent': -1, 'status': status}) # Modalità "busy"
-            
-            self.log_callback(f"✅ Scansione storica completata: {processed_messages} messaggi elaborati")
-            self.progress_callback({'percent': 100, 'status': 'Scansione storica completata'})
-            
-        except Exception as e:
-            self.log_callback(f"❌ Errore scansione storica: {e}")
-            import traceback
-            self.log_callback(traceback.format_exc())
         
-        finally:
-            # Non impostare initial_scan_done qui, lascia che on_ready lo faccia
-            pass
+        total_messages = 0
+        processed_messages = 0
+        
+        # 💥 CICLO SU TUTTI I CANALI
+        for i, channel in enumerate(channels, 1):
+            self.log_callback(f"🚀 Inizio scansione storica su Canale '{channel.name}' ({i}/{len(channels)})...")
 
+            # Verifica permessi per ogni canale
+            if hasattr(channel, 'guild') and channel.guild:
+                bot_member = channel.guild.get_member(self.user.id)
+                if bot_member:
+                    permissions = channel.permissions_for(bot_member)
+                    if not permissions.read_message_history:
+                        self.log_callback(f"❌ Permesso negato: lettura cronologia messaggi su {channel.name}")
+                        continue
+            
+            try:
+                history_iter = channel.history(
+                    limit=None,
+                    before=discord.Object(id=oldest_message_id) if oldest_message_id else None,
+                    oldest_first=False 
+                )
+                
+                async for message in history_iter:
+                    total_messages += 1
+                    
+                    if SEARCH_STRING not in message.content:
+                        continue
+                    
+                    # ✅ PASSO 1: ESTRAI I DATI DAL MESSAGGIO
+                    try:
+                        trade_data, xml_att, img_att = extract_trade_data_fast(message)
+                        trade_data['message_id'] = message.id
+                        trade_data['channel_id'] = str(message.channel.id) # <-- AGGIUNTO
+                        
+                        # Inizializza con il fallback (timestamp) come PK temporanea
+                        fallback_pk = trade_data['fallback_account_name']
+                        trade_data['account_id'] = fallback_pk 
+
+                    except Exception as e:
+                        self.log_callback(f"⚠️ Errore estrazione dati msg {message.id}: {e}")
+                        continue
+                    
+                    # ================================================================
+                    # ✅ PASSO 2: LEGGI ALLEGATI IN MEMORIA
+                    # ================================================================
+                    account_name = trade_data.get('account_name')
+                    trade_data['xml_path'] = None
+                    trade_data['image_url'] = None
+                    xml_content_bytes = None
+                    image_content_bytes = None
+
+                    try:
+                        if xml_att:
+                            xml_content_bytes = await xml_att.read()
+                        if img_att:
+                            image_content_bytes = await img_att.read()
+                            trade_data['image_url'] = img_att.url
+                    except Exception as e:
+                        self.log_callback(f"⚠️ Errore lettura allegati in RAM (Storico): {e}")
+                        continue
+
+                    # ================================================================
+                    # ✅ GESTIONE XML IN-MEMORIA E SYNC INVENTARIO
+                    # ================================================================
+                    device_account_pk = None # ID univoco estratto
+                    device_password = None
+                    
+                    if xml_content_bytes:
+                        try:
+                            root = ET.fromstring(xml_content_bytes)
+                            data = {child.get('name'): child.text for child in root.findall('string')}
+                            device_account_pk, device_password = data.get('deviceAccount'), data.get('devicePassword')
+                            
+                            if device_account_pk:
+                                trade_data['xml_path'] = "DB_STORED"
+                                # 💥 AGGIORNA TRADE_DATA: Usa l'ID univoco come PK
+                                trade_data['account_id'] = device_account_pk 
+                                
+                        except Exception as e:
+                            self.log_callback(f"⚠️ Errore parsing XML in-memory (Storico): {e}")
+
+                    # 💥 CREA/RECUPERA ACCOUNT: Usa l'ID definitivo determinato sopra
+                    final_pk = self._get_or_create_account(fallback_pk, device_account_pk, device_password)
+                    
+                    # Assicura che trade_data['account_id'] abbia il final_pk restituito (per coerenza)
+                    if final_pk:
+                        trade_data['account_id'] = final_pk
+
+                    # ================================================================
+                    # ✅ GESTIONE IMMAGINE (Thumbnail BLOB)
+                    # ================================================================
+                    screenshot_thumb_blob = None
+                    if image_content_bytes:
+                        screenshot_thumb_blob = self._create_screenshot_thumbnail(image_content_bytes)
+                    
+                    # ================================================================
+                    # ✅ PASSO 3: INSERISCI IL TRADE NEL DATABASE
+                    # ================================================================
+                    try:
+                        # Usiamo trade_data['account_id'] che contiene la PK definitiva (Device ID o Fallback)
+                        lookup_account = trade_data['account_id'] 
+                        
+                        cursor = self.db_conn.cursor()
+                        cursor.execute("""
+                            INSERT OR IGNORE INTO trades 
+                            (message_id, account_id, account_name, xml_path, image_url, 
+                            screenshot_thumbnail_blob, message_link, cards_found_text, scan_status)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            str(trade_data['message_id']),
+                            lookup_account,  
+                            trade_data['fallback_account_name'], # Account name display
+                            trade_data.get('xml_path'),
+                            trade_data.get('image_url'),
+                            screenshot_thumb_blob,
+                            trade_data.get('message_link'),
+                            trade_data.get('cards_found_text'),
+                            0  # scan_status = 0
+                        ))
+                        self.db_conn.commit()
+                        
+                        trade_data['screenshot_thumbnail_blob'] = screenshot_thumb_blob
+                        self.trade_callback(trade_data) 
+                        
+                    except Exception as e:
+                        self.log_callback(f"⚠️ Errore INSERT trade msg {message.id}: {e}")
+                        continue
+                    
+                    # ✅ PASSO 4: SCANSIONA IMMAGINE
+                    if image_content_bytes:
+                        try:
+                            await self.scan_image_for_cards(trade_data, image_content_bytes) 
+                        except Exception as e:
+                            self.log_callback(f"⚠️ Errore scansione immagine: {e}")
+                    
+                    # Aggiorna progress
+                    processed_messages += 1
+                    status = f"Scansione storica: {processed_messages} processati ({channel.name})"
+                    self.progress_callback({'percent': -1, 'status': status})
+                
+            except Exception as e:
+                self.log_callback(f"❌ Errore scansione storica in {channel.name}: {e}")
+                import traceback
+                self.log_callback(traceback.format_exc())
+            
+            finally:
+                self.log_callback(f"✅ Scansione storica completata su Canale '{channel.name}'.")
+
+        self.log_callback(f"✅ Scansione storica completata su tutti i canali: {processed_messages} messaggi elaborati")
+        self.progress_callback({'percent': 100, 'status': 'Scansione storica completata'})
+        self.initial_scan_done = True
         
     async def perform_incremental_scan_fast(self):
-        """Scansione incrementale con cache ottimizzato."""
+        """Scansione incrementale con cache ottimizzato, ciclando su tutti i canali."""
         start_time = time.time()
         
-        channel = self.get_channel(int(os.getenv('CHANNEL_ID', '0')))
-        if not channel:
-            self.log_callback("❌ Canale non trovato")
-            self.initial_scan_done = True
+        channels = self._get_channels()
+        if not channels:
+            self.log_callback("❌ Nessun canale valido configurato per la scansione incrementale.")
             return
-        
-        # ❌ RIMOSSO: max_msg_id_from_log
-        
+            
         # ✅ CACHE OTTIMIZZATO - Aggiorna ogni 60s
         if self.last_cache_update == 0 or (time.time() - self.last_cache_update > 60):
             try:
                 cursor = self.db_conn.cursor()
-                # ✅ MODIFICATO: Interroga la nuova tabella 'trades'
+                # Interroga la nuova tabella 'trades' per l'ID del messaggio più recente in tutti i canali
                 cursor.execute("SELECT MAX(CAST(message_id AS INTEGER)) FROM trades")
                 result = cursor.fetchone()
                 if result and result[0]:
@@ -517,23 +605,32 @@ class TradeMonitorClient(discord.Client):
         max_msg_id = self.last_message_id_cache
         
         if max_msg_id > 0:
+            total_new_messages = 0
+            all_new_messages = []
             
-            new_messages = []
-            try:
-                async for message in channel.history(limit=None, after=discord.Object(id=max_msg_id), oldest_first=False):
-                    new_messages.append(message)
-            except Exception as e:
-                self.log_callback(f"❌ Errore fetch: {e}")
-                return
-            
-            if new_messages:
-                self.log_callback(f"📨 Trovati {len(new_messages)} messaggi")
+            # 💥 CICLA SU TUTTI I CANALI
+            for channel in channels:
+                try:
+                    # Fetch messaggi DOPO l'ID più alto trovato nel DB, indipendentemente dal canale
+                    async for message in channel.history(limit=None, after=discord.Object(id=max_msg_id), oldest_first=False):
+                        all_new_messages.append(message)
+                        
+                except Exception as e:
+                    self.log_callback(f"❌ Errore fetch in {channel.name}: {e}")
+                    continue
+
+            if all_new_messages:
+                total_new_messages = len(all_new_messages)
+                self.log_callback(f"📨 Trovati {total_new_messages} messaggi in totale nei canali.")
                 batch = []
                 
-                for i, message in enumerate(new_messages):
+                # Ordina i messaggi per ID per elaborazione sequenziale (opzionale ma consigliato)
+                all_new_messages.sort(key=lambda m: m.id)
+
+                for i, message in enumerate(all_new_messages):
                     batch.append(message)
-                    percent = int(((i + 1) / len(new_messages)) * 100) if len(new_messages) > 0 else 0
-                    status = f"Nuovi messaggi {i+1}/{len(new_messages)}"
+                    percent = int(((i + 1) / total_new_messages) * 100) if total_new_messages > 0 else 0
+                    status = f"Nuovi messaggi {i+1}/{total_new_messages} ({message.channel.name})"
                     self.progress_callback({'percent': percent, 'status': status})
                     
                     if len(batch) >= BATCH_SIZE:
@@ -543,44 +640,33 @@ class TradeMonitorClient(discord.Client):
                 if batch:
                     await self.process_message_batch_fast(batch)
                 
-                # ❌ RIMOSSO: save_trade_log_fast(self.trade_log)
-                
                 elapsed = time.time() - start_time
-                self.log_callback(f"✅ Elaborati {len(new_messages)} messaggi in {elapsed:.2f}s")
+                self.log_callback(f"✅ Elaborati {total_new_messages} messaggi in {elapsed:.2f}s")
             else:
-                self.log_callback("✅ Nessun nuovo messaggio")
-    
-    async def download_with_semaphore(self, trade_data, attachment, folder, filename, att_type):
-        """Download con semaphore."""
-        async with self.semaphore:
-            file_path, status = await download_attachment_fast(self.session, attachment, folder, filename)
-            
-            if file_path:
-                if att_type == 'image':
-                    trade_data['image_path'] = file_path
-                elif att_type == 'xml':
-                    trade_data['xml_path'] = file_path
-    
-    # In discord_client.py
+                self.log_callback("✅ Nessun nuovo messaggio")    
+
+
+
 
     async def process_message_batch_fast(self, messages: List) -> int:
-        """
-        Processa batch in PARALLELO.
-        MODIFICATO: Legge XML e Immagine in memoria.
-        """
-        if not messages: return 0
+        """Processa batch in PARALLELO."""
+        if not messages: 
+            return 0
         
         trades_to_insert = [] 
-        tasks_to_run = [] # Task di scansione e sync
+        tasks_to_run = []
         
         cursor = self.db_conn.cursor()
         
         for message in messages:
-            if SEARCH_STRING not in message.content: continue
+            if SEARCH_STRING not in message.content: 
+                continue
             
-            try: # Controllo duplicati (invariato)
+            try:
+                # Controllo duplicato del messaggio
                 cursor.execute("SELECT 1 FROM trades WHERE message_id = ?", (str(message.id),))
-                if cursor.fetchone(): continue 
+                if cursor.fetchone(): 
+                    continue 
             except Exception as e:
                 print(f"Errore controllo duplicato: {e}")
                 continue
@@ -589,141 +675,203 @@ class TradeMonitorClient(discord.Client):
             trade_data['xml_path'] = None
             trade_data['image_url'] = None
             
-            # Dati che servono per i task asincroni
-            account_name = trade_data.get('account_name')
-            
-            # Variabili per i dati in-memory
             xml_content_bytes = None
             image_content_bytes = None
             
-            # ================================================================
-            # ✅ LEGGI ALLEGATI IN MEMORIA
-            # ================================================================
             try:
                 if xml_att:
                     xml_content_bytes = await xml_att.read()
                 if img_att:
                     image_content_bytes = await img_att.read()
-                    trade_data['image_url'] = img_att.url # Salva l'URL
+                    trade_data['image_url'] = img_att.url
             except Exception as e:
                 self.log_callback(f"⚠️ Errore lettura allegati in RAM: {e}")
-                continue # Salta questo messaggio
+                continue
             
-            # ================================================================
-            # ✅ GESTIONE XML IN-MEMORIA E SYNC INVENTARIO
-            # ================================================================
+            # ✅ GESTIONE ACCOUNT CORRETTA - Priorità a deviceAccount
+            fallback_account_name = trade_data['fallback_account_name']
+            device_password = None
+            xml_pk_id = None # ID univoco da XML (se presente)
+
             if xml_content_bytes:
                 try:
                     root = ET.fromstring(xml_content_bytes)
                     data = {child.get('name'): child.text for child in root.findall('string')}
-                    d_acc, d_pass = data.get('deviceAccount'), data.get('devicePassword')
                     
-                    if d_acc and d_pass:
-                        account_id = self._get_or_create_account(account_name, d_acc, d_pass)
-                        # Aggiungi il task di sync inventario
+                    d_acc = data.get('deviceAccount')
+                    d_pass = data.get('devicePassword')
+                    
+                    if d_acc:
+                        # ✅ Caso 1: XML ha deviceAccount - Usa l'ID univoco come PK
+                        device_password = d_pass
                         trade_data['xml_path'] = "DB_STORED"
-                except Exception as e:
-                    self.log_callback(f"⚠️ Errore parsing XML in-memory: {e}")
+                        xml_pk_id = d_acc # Usato per chiamare _get_or_create_account
+                    else:
+                        self.log_callback(f"⚠️ XML senza deviceAccount msg {message.id}, uso fallback: {fallback_account_name}")
 
+                except Exception as e:
+                    self.log_callback(f"⚠️ Errore parsing XML in-memory msg {message.id}: {e}")
+            
+            # 💥 CHIAMA _get_or_create_account: 
+            final_pk = self._get_or_create_account(fallback_account_name, xml_pk_id, device_password)
+            
+            # Aggiorna il dizionario con l'ID definitivo che è stato usato come PK
+            trade_data['account_name'] = fallback_account_name # Nome display (originale)
+            trade_data['account_id'] = final_pk               # ⬅️ ID univoco (PK)
+            
             # ================================================================
             # ✅ GESTIONE IMMAGINE IN-MEMORIA E SCANSIONE
             # ================================================================
             screenshot_thumb_blob = None
             if image_content_bytes:
-                # 1. Crea thumbnail per il DB
                 screenshot_thumb_blob = self._create_screenshot_thumbnail(image_content_bytes)
-                
-                # 2. Aggiungi il task di scansione
                 tasks_to_run.append(self.scan_image_for_cards(trade_data, image_content_bytes))
             
             # ================================================================
-            # ✅ STEP 3: PREPARA E SALVA I TRADE NEL DB
+            # ✅ PREPARA I TRADE NEL DB
             # ================================================================
-            self.trade_callback(trade_data) # Aggiorna la UI (Tab Bot)
+            trade_data['screenshot_thumbnail_blob'] = screenshot_thumb_blob
+            self.trade_callback(trade_data)
             
-            account_id = self._get_or_create_account(account_name)
-            
+            # ✅ Usa final_pk come account_id nella tabella trades
             trades_to_insert.append((
                 str(trade_data['message_id']),
-                account_id,
-                account_name,
+                final_pk,                      # ← PK definitiva/fallback
+                fallback_account_name,         # ← Nome file originale
                 trade_data.get('xml_path'),
-                trade_data.get('image_url'), # <-- URL salvato
-                screenshot_thumb_blob,       # <-- Thumbnail salvato
+                trade_data.get('image_url'), 
+                screenshot_thumb_blob,       
                 trade_data.get('message_link'),
                 trade_data.get('cards_found_text'),
-                0 # scan_status = 0 (In attesa)
+                0  # scan_status = 0
             ))
 
-        # Fine loop messaggi
-        
         # Salva tutti i trade nel DB
         if trades_to_insert:
             try:
                 cursor.executemany("""
                     INSERT OR IGNORE INTO trades 
                     (message_id, account_id, account_name, xml_path, image_url, 
-                     screenshot_thumbnail_blob, message_link, cards_found_text, scan_status)
+                    screenshot_thumbnail_blob, message_link, cards_found_text, scan_status)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, trades_to_insert)
                 self.db_conn.commit()
             except Exception as e:
                 self.log_callback(f"❌ Errore INSERT batch trades: {e}")
 
-        # ✅ STEP 4: ESEGUI TUTTI I TASK (Sync Inventario + Scansione Immagini)
+        # Esegui scan tasks
         if tasks_to_run:
             await asyncio.gather(*tasks_to_run, return_exceptions=True)
         
         return len(trades_to_insert)
 
+    async def _download_attachment_to_bytes(self, image_url: str) -> Optional[bytes]:
+        """Scarica l'allegato su byte dalla URL, gestendo i tentativi."""
+        # Assumiamo che self.session sia una aiohttp.ClientSession
+        if not hasattr(self, 'session') or self.session.closed:
+            # Se la sessione non è pronta (non dovrebbe accadere in on_ready)
+            return None 
 
+        for attempt in range(MAX_RETRIES):
+            try:
+                # Usa self.session
+                async with self.session.get(image_url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                    if resp.status == 200:
+                        return await resp.read()
+                    elif resp.status in (404, 403):
+                        # URL non più valido, fermiamo i tentativi
+                        self.log_callback(f"❌ Download fallito (Status {resp.status}) per URL: {image_url}")
+                        return None 
+                    elif attempt == MAX_RETRIES - 1:
+                        return None
+            except Exception as e:
+                if attempt == MAX_RETRIES - 1:
+                    self.log_callback(f"❌ Errore download finale per {image_url}: {e}")
+                    return None
+            await asyncio.sleep(RETRY_DELAY)
+        return None
+
+    # discord_client.py (dentro la classe TradeMonitorClient)
 
     async def scan_image_for_cards(self, trade_data, image_bytes):
         """
-        Scansiona immagine (dai bytes) e fa UPDATE sul DB con i risultati.
-        MODIFICATO: Passa un oggetto PIL.Image al recognizer.
+        Scansiona immagine (dai bytes), aggiorna Trade e popola found_cards/account_inventory.
+        CORRETTO: Usa trade_data.get('account_id') come chiave primaria (PK) se disponibile.
         """
         if self.card_recognition_executor._shutdown or not image_bytes:
             return
         
-        account_name = trade_data.get('account_name')
+        # ✅ CORREZIONE INPUT: Cerca prima 'account_id' (la PK nella tabella trades)
+        # altrimenti usa 'account_name' (la PK settata in 'process_message_batch_fast')
+        account_id_pk = trade_data.get('account_id') or trade_data.get('account_name')
         message_id = str(trade_data.get('message_id'))
         
-        scan_status = 2 # Default = Errore
+        if not account_id_pk:
+            self.log_callback(f"❌ Impossibile determinare ID PK per trade: {message_id}")
+            return
+        
+        # Protezione: Verifica connessione DB
+        if self.db_conn is None:
+            try:
+                self.log_callback("⚠️ Riconnessione al database...")
+                self.db_conn = sqlite3.connect(DB_FILENAME, check_same_thread=False, timeout=10.0)
+                self.db_conn.execute("PRAGMA journal_mode = WAL")
+                self.db_conn.row_factory = sqlite3.Row
+                self.log_callback("✅ Database riconnesso")
+            except Exception as e:
+                self.log_callback(f"❌ Impossibile riconnettersi al DB: {e}")
+                return
+        
+        # --- RECUPERO O CREAZIONE ACCOUNT (CRUCIALE) ---
+        device_account = None
+        try:
+            # ✅ _get_or_create_account() crea l'account (o lo recupera) e ritorna la PK (device_account)
+            device_account = self._get_or_create_account(account_id_pk)
+            
+            if not device_account:
+                self.log_callback(f"❌ Impossibile determinare Device ID per account: {account_id_pk}")
+                return
+            
+        except Exception as e:
+            self.log_callback(f"❌ Errore durante la verifica/creazione Account: {e}")
+            return 
+
+        # --- VARIABILI INIZIALI ---
+        scan_status = 2  # Default = Errore
         results_json = "[]"
         results = []
 
+        # --- Esecuzione scansione immagine ---
         try:
-            # ✅ Converti i bytes in un oggetto PIL.Image
             source_img = Image.open(io.BytesIO(image_bytes))
 
             loop = asyncio.get_event_loop()
             results = await asyncio.wait_for(
                 loop.run_in_executor(
                     self.card_recognition_executor,
-                    # ✅ MODIFICATO: Chiama la nuova funzione in-memory
                     self.card_recognizer.recognize_from_image, 
                     source_img,
-                    False, # save_to_db
-                    None,  # account_name
-                    None   # image_path_for_db
+                    False, 
+                    None, 
+                    None   
                 ),
                 timeout=30.0
             )
-            scan_status = 1 # Successo
+            scan_status = 1 
             if results:
-                results_json = json.dumps(results) # Salva il JSON completo
+                results_json = json.dumps(results)
 
         except asyncio.TimeoutError:
             self.log_callback(f"⏱️ Timeout: Scansione fallita per {message_id}")
         except RuntimeError as e:
-            if "cannot schedule new futures after shutdown" in str(e): return
+            if "cannot schedule new futures after shutdown" in str(e): 
+                return
             raise
         except Exception as e:
             self.log_callback(f"❌ Errore scansione immagine {message_id}: {e}")
 
         # ================================================================
-        # ✅ PASSO 1: Aggiorna la tabella 'trades' con i risultati
+        # PASSO 1: Aggiorna la tabella 'trades' con i risultati
         # ================================================================
         try:
             cursor = self.db_conn.cursor()
@@ -737,10 +885,10 @@ class TradeMonitorClient(discord.Client):
             self.log_callback(f"❌ Errore UPDATE trade {message_id}: {e}")
 
         if not results:
-            return # Nessuna carta trovata
+            return 
         
         # ================================================================
-        # ✅ PASSO 2: Invia le carte trovate alla UI (Batch Writer)
+        # PASSO 2: Inserimento in found_cards e account_inventory
         # ================================================================
         
         filtered_cards = [c for c in results if c.get('rarity') in SELECTED_RARITIES]
@@ -748,24 +896,87 @@ class TradeMonitorClient(discord.Client):
         if not filtered_cards:
             return
         
+        found_cards_batch = []
         
-        for card_data in filtered_cards:
+        # Recupera card_id in batch
+        card_identifiers = [(c['set_code'], c['card_number']) for c in filtered_cards]
+        
+        placeholders = ', '.join(['(?, ?)' for _ in card_identifiers])
+        flat_params = [item for pair in card_identifiers for item in pair]
+        
+        card_id_map = {}
+        if placeholders:
             try:
-                callback_data = {
-                    "account_name": account_name,
-                    "card_name": card_data.get('card_name', 'Unknown'),
-                    "card_number": card_data.get('card_number', '?'),
-                    "set_code": card_data.get('set_code', 'Unknown'),
-                    "rarity": card_data.get('rarity', 'NA'),
-                    "similarity": card_data.get('similarity', 0),
-                    "image_path": trade_data.get('image_url', ''), # URL Screenshot
-                    "local_image_path": card_data.get('local_image_path', ''), # URL Carta
-                    "message_id": message_id,
-                }
-                self.card_found_callback(callback_data) 
+                cursor = self.db_conn.cursor()
+                cursor.execute(f"""
+                    SELECT id, set_code, card_number FROM cards 
+                    WHERE (set_code, card_number) IN ({placeholders})
+                """, flat_params)
+                card_id_map = {(row[1], row[2]): row[0] for row in cursor.fetchall()}
             except Exception as e:
-                self.log_callback(f"❌ Errore callback: {e}")
+                self.log_callback(f"❌ Errore batch fetch card_id: {e}. Riprovo singolarmente.")
+        
+        screenshot_blob = trade_data.get('screenshot_thumbnail_blob')
 
+        for card_data in filtered_cards:
+            set_code = card_data.get('set_code')
+            card_number = card_data.get('card_number')
+            
+            card_id = card_id_map.get((set_code, card_number))
+            if not card_id:
+                # Fallback di recupero se non trovato in batch
+                try:
+                    cursor = self.db_conn.cursor()
+                    cursor.execute("""
+                        SELECT id FROM cards 
+                        WHERE set_code = ? AND card_number = ?
+                    """, (set_code, card_number))
+                    row = cursor.fetchone()
+                    if row:
+                        card_id = row[0]
+                        card_id_map[(set_code, card_number)] = card_id
+                except Exception as e:
+                    self.log_callback(f"❌ Impossibile trovare card_id per {set_code}-{card_number}: {e}")
+                    continue
+
+            # --- Aggiorna Found Cards (usa message_id) ---
+            found_cards_batch.append((
+                card_id,
+                message_id,  
+                device_account,  # ✅ device_account (PK)
+                card_data.get('similarity', 0),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ))
+
+            # --- Aggiorna Account Inventory ---
+            self._insert_or_update_inventory(device_account, card_id, 1)
+
+            # --- Callback alla UI ---
+            callback_data = {
+                "account_name": trade_data.get('fallback_account_name', trade_data.get('account_name', 'Unknown')), 
+                "card_name": card_data.get('card_name', 'Unknown'),
+                "card_number": card_data.get('card_number', '?'),
+                "set_code": set_code,
+                "rarity": card_data.get('rarity', 'NA'),
+                "similarity": card_data.get('similarity', 0),
+                "image_url_screenshot": trade_data.get('image_url', ''), 
+                "screenshot_thumbnail_blob": screenshot_blob,
+                "message_id": message_id,
+            }
+            self.card_found_callback(callback_data) 
+        
+        # --- Esecuzione Batch Found Cards ---
+        if found_cards_batch:
+            try:
+                cursor = self.db_conn.cursor()
+                cursor.executemany("""
+                    INSERT INTO found_cards 
+                    (card_id, message_id, account_id, confidence_score, found_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, found_cards_batch)
+                self.db_conn.commit()
+            except Exception as e:
+                self.log_callback(f"❌ Errore INSERT batch found_cards: {e}")
 
 
     async def on_message(self, message):
@@ -784,46 +995,88 @@ class TradeMonitorClient(discord.Client):
             # ❌ RIMOSSO: save_trade_log_fast(self.trade_log)
 
 
+    def _clean_filename_for_account(filename_raw):
+        """
+        Pulisce il nome del file per ottenere un identificativo account di fallback.
+        Esempio: '23P_20251024212128_3(B).xml' -> '20251024212128'
+        """
+        if not filename_raw:
+            return "unknown_account"
+            
+        # Rimuovi estensione
+        name = filename_raw.rsplit('.', 1)[0]
+        
+        # Logica specifica: Prendi la parte centrale tra i primi due underscore
+        # Es: 23P_20251024212128_3(B) -> split('_') -> ['23P', '20251024212128', '3(B)']
+        parts = name.split('_')
+        if len(parts) >= 2:
+            # Restituisci la seconda parte (spesso è l'ID o Timestamp dell'utente)
+            return parts[1]
+        
+        # Fallback: restituisci il nome intero pulito
+        return name
 
+
+
+
+# =========================================================================
+# 🔧 FUNZIONI HELPER GLOBALI (Fuori dalla classe TradeMonitorClient)
+# =========================================================================
+
+def _clean_filename_for_account(filename_raw):
+    """
+    Pulisce il nome del file per ottenere un identificativo account di fallback.
+    Esempio: '23P_20251024212128_3(B).xml' -> '20251024212128'
+    """
+    if not filename_raw:
+        return "unknown_account"
+        
+    # Rimuovi estensione
+    name = filename_raw.rsplit('.', 1)[0]
+    
+    # Logica specifica: Prendi la parte centrale tra i primi due underscore
+    # Es: 23P_20251024212128_3(B) -> split('_') -> ['23P', '20251024212128', '3(B)']
+    parts = name.split('_')
+    if len(parts) >= 2:
+        # Restituisci la seconda parte (spesso è l'ID o Timestamp dell'utente)
+        return parts[1]
+    
+    # Fallback: restituisci il nome intero pulito
+    return name
 
 def extract_trade_data_fast(message):
     """
     Estrae i dati del trade da un messaggio Discord.
-    MODIFICATO: Estrae 'cards_found_text' per il DB.
+    MODIFICATO: Usa _clean_filename_for_account per il fallback.
     """
     content = message.content
     
-    # 1️⃣ Estrai l'account_name (Logica invariata)
-    account_name = "unknown_account"
+    # 1️⃣ Estrai il nome file XML (Grezzo) dagli allegati
+    xml_filename_raw = None
     for att in message.attachments:
         if att.filename.endswith(".xml"):
-            account_name = att.filename.replace(".xml", "").strip()
+            xml_filename_raw = att.filename
             break
     
-    if account_name == "unknown_account":
-        file_pattern = r'File name: ([\w\-\(\)]+\.xml)'
+    # Se non c'è allegato, cerca nel testo "File name: ..."
+    if not xml_filename_raw:
+        file_pattern = r'File name: ([\w\-\(\)\.]+\.xml)'
         match = re.search(file_pattern, content)
         if match:
-            xml_filename = match.group(1)
-            account_name = xml_filename.replace(".xml", "").strip()
+            xml_filename_raw = match.group(1)
+            
+    # 2️⃣ Determina un nome account "Fallback" (dal nome file pulito)
+    # ✅ ORA QUESTA CHIAMATA FUNZIONERÀ
+    fallback_account_name = _clean_filename_for_account(xml_filename_raw) if xml_filename_raw else "unknown_account"
     
-    # 2️⃣ Estrai il nome del file XML dal testo (Logica invariata)
-    xml_filename_text = "N/A"
-    file_line_match = re.search(r'File name: ([\w\-\(\)\.]+)', content)
-    if file_line_match:
-        xml_filename_text = file_line_match.group(1)
-    
-    # ================================================================
-    # ✅ MODIFICATO: Estrai il testo "Found:"
-    # ================================================================
+    # 3️⃣ Estrai il testo "Found:"
     cards_found_text = ""
     cards_pattern = r'Found: ([\w\s]+(?:\s*\(x\d+\))?(?:,\s*[\w\s]+\s*\(x\d+\))*)'
     cards_match = re.search(cards_pattern, content)
     if cards_match:
         cards_found_text = cards_match.group(1).strip()
-    # ================================================================
     
-    # 4️⃣ Estrai gli allegati (Logica invariata)
+    # 4️⃣ Estrai gli allegati oggetti
     xml_att = None
     image_att = None
     
@@ -838,16 +1091,16 @@ def extract_trade_data_fast(message):
     
     return {
         "message_id": message.id,
-        "account_name": account_name,
-        "xml_filename_text": xml_filename_text,
-        "cards_found_text": cards_found_text, # <-- ✅ Per il DB (tabella trades)
-        "cards_found": cards_found_text,      # <-- Per compatibilità UI (tabella trades_table)
+        "fallback_account_name": fallback_account_name, # ✅ Usato se XML non parsabile
+        "account_name": fallback_account_name,          # ✅ Default (verrà sovrascritto)
+        "xml_filename_text": xml_filename_raw or "N/A",
+        "cards_found_text": cards_found_text,
+        "cards_found": cards_found_text,
         "message_link": message.jump_url,
         "elaborato": False,  
         "cards": []  
     }, xml_att, image_att
 
-    
 async def download_attachment_fast(session: aiohttp.ClientSession, attachment,
                                    sub_folder: str, filename: str) -> Tuple[Optional[str], str]:
     """Downloads an attachment from Discord."""
@@ -873,27 +1126,3 @@ async def download_attachment_fast(session: aiohttp.ClientSession, attachment,
         await asyncio.sleep(RETRY_DELAY)
     
     return None, 'failed'
-
-#def load_trade_log_fast():
-#    """Loads the trade log from the JSON file."""
-#    if os.path.exists(LOG_FILENAME):
-#        try:
-#            with open(LOG_FILENAME, 'r', encoding='utf-8') as f:
-#                return json.load(f)
-#        except:
-#            return []
-#    return []
-#
-#def save_trade_log_fast(trade_log):
-#    """Saves the trade log to the JSON file with pretty formatting."""
-#    try:
-#        with open(LOG_FILENAME, 'w', encoding='utf-8') as f:
-#            json.dump(
-#                trade_log, 
-#                f, 
-#                ensure_ascii=False, 
-#                indent=4,  # ✅ PRETTIFY: indentazione di 2 spazi
-#                sort_keys=False  # ✅ Mantiene l'ordine delle chiavi
-#            )
-#    except:
-#        pass

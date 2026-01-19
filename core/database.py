@@ -25,6 +25,7 @@ class DatabaseValidator:
             ('set_code', 'TEXT PRIMARY KEY'),
             ('set_name', 'TEXT NOT NULL'),
             ('cover_image_path', 'TEXT'),
+            ('cover_image_blob', 'BLOB'),
             ('release_date', 'TEXT'),
             ('total_cards', 'INTEGER DEFAULT 0'),
             ('url', 'TEXT'),
@@ -43,27 +44,31 @@ class DatabaseValidator:
             ('thumbnail_blob', 'BLOB'),
             ('created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
         ],
+        # database.py (dentro TABLES_SCHEMA)
+
         'accounts': [
-            ('account_id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-            ('account_name', 'TEXT UNIQUE NOT NULL'),
+            ('device_account', 'TEXT PRIMARY KEY'),        # <-- ✅ NUOVA CHIAVE PRIMARIA
+            ('account_name', 'TEXT NOT NULL'),             # <-- Non più UNIQUE. Nome di visualizzazione/Fallback
+            ('alias', 'TEXT'),
+            ('shiny_dust', 'INTEGER DEFAULT 0'),
+            ('hourglasses', 'INTEGER DEFAULT 0'),
             ('discord_user_id', 'TEXT'),
-            ('device_account', 'TEXT'),  # ✅ NUOVO
-            ('device_password', 'TEXT'), # ✅ NUOVO
+            ('device_password', 'TEXT'),
             ('created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
             ('last_updated', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
         ],
         'account_inventory': [
             ('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-            ('account_id', 'INTEGER NOT NULL'),
+            ('account_id', 'TEXT NOT NULL'),   # <-- ✅ MODIFICATO: TEXT
             ('card_id', 'INTEGER NOT NULL'),
             ('quantity', 'INTEGER DEFAULT 1'),
             ('acquisition_date', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
-            ('UNIQUE(account_id, card_id)', '')  # <-- ✅ AGGIUNGI QUESTO VINCOLO
+            ('UNIQUE (account_id, card_id)', '')
         ],
         'found_cards': [
             ('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
             ('card_id', 'INTEGER NOT NULL'),
-            ('account_id', 'INTEGER'),
+            ('account_id', 'TEXT'),            # <-- ✅ CORRETTO: Deve essere TEXT
             ('message_id', 'TEXT'),
             ('channel_id', 'TEXT'),
             ('user_id', 'TEXT'),
@@ -80,7 +85,7 @@ class DatabaseValidator:
         ],
         'trades': [
             ('message_id', 'TEXT PRIMARY KEY'),
-            ('account_id', 'INTEGER'),
+            ('account_id', 'TEXT'),
             ('account_name', 'TEXT'),
             ('xml_path', 'TEXT'),
             ('image_url', 'TEXT'),
@@ -90,6 +95,15 @@ class DatabaseValidator:
             ('processed_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
             ('scan_status', 'INTEGER DEFAULT 0'), 
             ('scan_results_json', 'TEXT')
+        ],
+        'manual_trades': [
+            ('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
+            ('account_id', 'TEXT NOT NULL'), # <-- ✅ CORRETTO: Deve essere TEXT
+            ('card_id', 'INTEGER NOT NULL'),
+            ('trade_date', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
+            ('quantity_traded', 'INTEGER NOT NULL DEFAULT 1'),
+            ('FOREIGN KEY(account_id) REFERENCES accounts(device_account)', ''), # <-- ✅ CRUCIALE: Riferisce device_account
+            ('FOREIGN KEY(card_id) REFERENCES cards(id)', '')
         ],
     }
     
@@ -187,9 +201,16 @@ class DatabaseValidator:
     def _create_all_tables(self, cursor):
         """Crea TUTTE le tabelle da zero."""
         for table_name, columns in self.TABLES_SCHEMA.items():
-            col_defs = ', '.join([f"{col} {dtype}" for col, dtype in columns])
+            # Filtra le definizioni di colonna (hanno un tipo)
+            col_list = [f"{col} {dtype}" for col, dtype in columns if dtype]
+            # Filtra i vincoli di tabella (non hanno un tipo)
+            constraint_list = [col for col, dtype in columns if not dtype]
             
-            create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({col_defs})"
+            # Unisci le due liste
+            all_defs = col_list + constraint_list
+            col_defs_str = ', '.join(all_defs)
+            
+            create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({col_defs_str})"
             
             try:
                 cursor.execute(create_sql)
@@ -232,6 +253,7 @@ class DatabaseManager:
             ('set_code', 'TEXT PRIMARY KEY'),
             ('set_name', 'TEXT NOT NULL'),
             ('cover_image_path', 'TEXT'),
+            ('cover_image_blob', 'BLOB'),
             ('release_date', 'TEXT'),
             ('total_cards', 'INTEGER DEFAULT 0'),
             ('url', 'TEXT'),
@@ -250,27 +272,31 @@ class DatabaseManager:
             ('thumbnail_blob', 'BLOB'),
             ('created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
         ],
+        # database.py (dentro TABLES_SCHEMA)
+
         'accounts': [
-            ('account_id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-            ('account_name', 'TEXT UNIQUE NOT NULL'),
+            ('device_account', 'TEXT PRIMARY KEY'),        # <-- ✅ NUOVA CHIAVE PRIMARIA
+            ('account_name', 'TEXT NOT NULL'),             # <-- Non più UNIQUE. Nome di visualizzazione/Fallback
+            ('alias', 'TEXT'),
+            ('shiny_dust', 'INTEGER DEFAULT 0'),
+            ('hourglasses', 'INTEGER DEFAULT 0'),
             ('discord_user_id', 'TEXT'),
-            ('device_account', 'TEXT'),
             ('device_password', 'TEXT'),
             ('created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
             ('last_updated', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
         ],
         'account_inventory': [
             ('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-            ('account_id', 'INTEGER NOT NULL'),
+            ('account_id', 'TEXT NOT NULL'),   # <-- ✅ MODIFICATO: TEXT
             ('card_id', 'INTEGER NOT NULL'),
             ('quantity', 'INTEGER DEFAULT 1'),
             ('acquisition_date', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
-            ('UNIQUE (account_id, card_id)', '')  # <-- CORREZIONE SINTASSI
+            ('UNIQUE (account_id, card_id)', '')
         ],
         'found_cards': [
             ('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
             ('card_id', 'INTEGER NOT NULL'),
-            ('account_id', 'INTEGER'),
+            ('account_id', 'TEXT'),            # <-- ✅ CORRETTO: Deve essere TEXT
             ('message_id', 'TEXT'),
             ('channel_id', 'TEXT'),
             ('user_id', 'TEXT'),
@@ -287,7 +313,7 @@ class DatabaseManager:
         ],
         'trades': [ # <-- TABELLA MANCANTE AGGIUNTA
             ('message_id', 'TEXT PRIMARY KEY'),
-            ('account_id', 'INTEGER'),
+            ('account_id', 'TEXT'),
             ('account_name', 'TEXT'),
             ('xml_path', 'TEXT'),
             ('image_url', 'TEXT'),
@@ -297,6 +323,15 @@ class DatabaseManager:
             ('processed_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
             ('scan_status', 'INTEGER DEFAULT 0'), 
             ('scan_results_json', 'TEXT')
+        ],
+        'manual_trades': [
+            ('id', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
+            ('account_id', 'TEXT NOT NULL'), # <-- ✅ CORRETTO: Deve essere TEXT
+            ('card_id', 'INTEGER NOT NULL'),
+            ('trade_date', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
+            ('quantity_traded', 'INTEGER NOT NULL DEFAULT 1'),
+            ('FOREIGN KEY(account_id) REFERENCES accounts(device_account)', ''), # <-- ✅ CRUCIALE: Riferisce device_account
+            ('FOREIGN KEY(card_id) REFERENCES cards(id)', '')
         ],
     }
     
@@ -496,14 +531,23 @@ class DatabaseManager:
         
         try:
             for table_name, columns in self.TABLES_SCHEMA.items():
-                col_defs = ', '.join([f"{col} {dtype}" for col, dtype in columns])
-                create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({col_defs})"
+                # Filtra le definizioni di colonna (hanno un tipo)
+                col_list = [f"{col} {dtype}" for col, dtype in columns if dtype]
+                # Filtra i vincoli di tabella (non hanno un tipo)
+                constraint_list = [col for col, dtype in columns if not dtype]
+                
+                # Unisci le due liste
+                all_defs = col_list + constraint_list
+                col_defs_str = ', '.join(all_defs)
+
+                create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({col_defs_str})"
                 
                 self.cursor.execute(create_sql)
             
             self.conn.commit()
         
         except Exception as e:
+            self.log_callback(f"❌ Errore setup_database: {e}") # Log esteso
             self.conn.rollback()
     
     

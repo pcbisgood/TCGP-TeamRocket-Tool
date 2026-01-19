@@ -2,7 +2,7 @@ aiohttp==3.10.10
 beautifulsoup4==4.14.2
 discord.py==2.4.0
 Flask==3.1.2
-numpy==2.3.4
+numpy==2.3.5
 opencv_python==4.10.0.84
 Pillow==12.0.0
 PyQt5==5.15.11

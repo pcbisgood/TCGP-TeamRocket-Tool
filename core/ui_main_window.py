@@ -4,6 +4,7 @@
 # 1. IMPORT LIBRERIA STANDARD (Built-in Python)
 # =========================================================================
 import os
+import io
 import sys
 import json
 import time
@@ -80,10 +81,12 @@ from PyQt5.QtWidgets import (
     QToolButton,
     QSizePolicy,
     QGraphicsOpacityEffect,
+    QDialogButtonBox,
 )
 
 # Optional: Windows Toasts
 from .notification_manager import send_toast_notification
+from .accounts_tab import AccountsTab
 
 # =========================================================================
 # 3. IMPORT MODULI LOCALI (Applicazione)
@@ -127,11 +130,455 @@ from .cloudflare import CloudflarePasswordDialog, CloudflareTunnelThread
 from .flask_server import FlaskServerThread
 
 # Import threads
-from .threads import DiscordBotThread, ScraperThread, CollectionLoaderThread
+from .threads import (
+    DiscordBotThread,
+    ScraperThread,
+    CollectionLoaderThread,
+    DiscordChannelLoaderThread,
+)
 
 # =========================================================================
 # 🖥️ GUI APPLICATION - MAIN WINDOW
 # =========================================================================
+
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap, QClipboard
+from PyQt5.QtCore import QTimer, pyqtSlot
+import weakref
+
+
+def send_discord_bot_message(card_data: dict) -> bool:
+    """
+    Invia notifica Discord con layout migliorato ed estetica accattivante.
+    
+    Layout Migliorato:
+    - Colore embed dinamico basato sulla rarità
+    - Carta grande come immagine principale
+    - Set cover come thumbnail
+    - Icona rarità nell'author dell'embed
+    - Layout compatto e leggibile
+    """
+    try:
+        import json
+        import threading
+        import os
+        import io
+        from datetime import datetime
+        
+        # Carica settings e config
+        from config import get_app_data_path, get_resource_path, RARITY_DATA
+        
+        settings_path = get_app_data_path("settings.json")
+        
+        if not os.path.exists(settings_path):
+            #print("⚠️ File settings.json non trovato")
+            return False
+        
+        with open(settings_path, 'r', encoding='utf-8') as f:
+            settings = json.load(f)
+        
+        # Leggi bot token e channel ID
+        bot_token = settings.get('token', '')
+        channel_id = settings.get('notification_channel', '')
+        
+        if not bot_token or not channel_id:
+            #print("⚠️ Discord bot token o channel ID non configurati")
+            return False
+        
+        try:
+            channel_id = int(channel_id)
+        except (ValueError, TypeError):
+            #print("❌ Discord channel ID non è un numero valido")
+            return False
+        
+        # ============================================================================
+        # ESTRAI DATI DALLA CARTA
+        # ============================================================================
+        
+        card_name = card_data.get('card_name', 'Unknown')
+        card_number = card_data.get('card_number', '?')
+        set_code = card_data.get('set_code', '?')
+        rarity = card_data.get('rarity', '?')
+        account_name = card_data.get('account_name', 'Unknown Account')
+        
+        # Blob dal database
+        thumbnail_blob = card_data.get('thumbnail_blob', None)
+        
+        # ✅ RECUPERA IL BLOB DEL SET DAL DATABASE
+        set_cover_blob = None
+        try:
+            from database import DatabaseManager
+            db = DatabaseManager()
+            db.connect()
+            
+            # Query per ottenere il blob del set cover
+            db.cursor.execute(
+                "SELECT cover_image_blob FROM sets WHERE set_code = ?",
+                (set_code,)
+            )
+            result = db.cursor.fetchone()
+            
+            if result and result[0]:
+                set_cover_blob = result[0]
+                #print(f"   ✅ Set cover blob recuperato per {set_code}")
+            #else:
+            #    print(f"   ⚠️ Set cover blob non trovato per {set_code}")
+            
+            db.close()
+            
+        except Exception as e:
+            print(f"   ⚠️ Errore recupero set cover blob: {e}")
+        
+        
+        # ============================================================================
+        # MAPPA COLORI PER RARITÀ
+        # ============================================================================
+    
+        
+        # Scegli il colore basato sulla rarità
+        embed_color =  0xFFD700  # Default: oro
+    
+        
+        # Crea il task async in un thread separato
+        def run_async():
+            import asyncio
+            
+            async def send():
+                try:
+                    import discord
+                    
+                    intents = discord.Intents.default()
+                    bot = discord.Client(intents=intents)
+                    
+                    @bot.event
+                    async def on_ready():
+                        #print(f"🤖 Bot connesso come: {bot.user}")
+                        
+                        channel = bot.get_channel(channel_id)
+                        
+                        if channel is None:
+                            #print(f"❌ Canale {channel_id} non trovato")
+                            await bot.close()
+                            return
+                        
+                        # ============================================================================
+                        # CREA L'EMBED - FORMATO COMPATTO
+                        # ============================================================================
+                        
+                        embed = discord.Embed(
+                            title=f"{card_name}",
+                            description="",
+                            color=embed_color
+                        )
+                        
+                        # ============================================================================
+                        # PREPARA I FILE DA INVIARE
+                        # ============================================================================
+                        
+                        files = []
+                        
+                        # 1️⃣ CARD IMAGE GRANDE (immagine principale sotto il titolo)
+                        if thumbnail_blob:
+                            try:
+                                files.append(
+                                    discord.File(
+                                        io.BytesIO(thumbnail_blob),
+                                        filename="card_image.png"
+                                    )
+                                )
+                                embed.set_image(url="attachment://card_image.png")
+                                #print("   ✅ Immagine carta aggiunta")
+                            except Exception as e:
+                                print(f"   ⚠️ Errore card image: {e}")
+                        
+                        # 2️⃣ ICONA RARITÀ (thumbnail a destra)
+                        if rarity in RARITY_DATA:
+                            rarity_icon_relative_path = RARITY_DATA[rarity]
+                            rarity_icon_path = get_resource_path(rarity_icon_relative_path)
+                            
+                            if os.path.exists(rarity_icon_path):
+                                try:
+                                    with open(rarity_icon_path, 'rb') as f:
+                                        rarity_image_data = f.read()
+                                    
+                                    files.append(
+                                        discord.File(
+                                            io.BytesIO(rarity_image_data),
+                                            filename="rarity_icon.png"
+                                        )
+                                    )
+                                    embed.set_thumbnail(url="attachment://rarity_icon.png")
+                                    #print("   ✅ Icona rarità aggiunta")
+                                except Exception as e:
+                                    print(f"   ⚠️ Errore icona rarità: {e}")
+                        
+                        # 3️⃣ SET COVER (come author icon)
+                        if set_cover_blob:
+                            try:
+                                files.append(
+                                    discord.File(
+                                        io.BytesIO(set_cover_blob),
+                                        filename="set_cover.png"
+                                    )
+                                )
+                                # Usa il set cover come icona dell'author
+                                embed.set_author(
+                                    name=f"{set_code}",
+                                    icon_url="attachment://set_cover.png"
+                                )
+                                #print("   ✅ Cover set aggiunta")
+                            except Exception as e:
+                                print(f"   ⚠️ Errore set cover: {e}")
+                        else:
+                            # Se non c'è set cover, usa solo il testo
+                            embed.set_author(name=f"{set_code}")
+                        
+                        # ============================================================================
+                        # FOOTER CON ACCOUNT
+                        # ============================================================================
+                        
+                        embed.set_footer(
+                            text=f"👤 {account_name}"
+                        )
+                        embed.timestamp = datetime.now()
+                        
+                        # ============================================================================
+                        # INVIA IL MESSAGGIO
+                        # ============================================================================
+                        
+                        try:
+                            if files:
+                                await channel.send(embed=embed, files=files)
+                                #print(f"✅ Notifica Discord inviata! ({len(files)} allegati)")
+                            else:
+                                await channel.send(embed=embed)
+                                #print("✅ Notifica Discord inviata (senza immagini)")
+                        except Exception as e:
+                            #print(f"❌ Errore invio messaggio: {e}")
+                            import traceback
+                            traceback.print_exc()
+                        finally:
+                            await bot.close()
+                    
+                    await bot.start(bot_token)
+                    
+                except Exception as e:
+                    #print(f"❌ Errore connessione bot: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            asyncio.run(send())
+        
+        # Avvia in thread per non bloccare l'UI
+        thread = threading.Thread(target=run_async, daemon=True)
+        thread.start()
+        
+        return True
+        
+    except Exception as e:
+        #print(f"❌ Errore send_discord_bot_message: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+
+class TunnelURLDialog(QDialog):
+    """Dialog per mostrare l'URL del tunnel con QR code e copia."""
+    
+    def __init__(self, url: str, parent=None):
+        super().__init__(parent)
+        self.url = url
+        self.setWindowTitle(t("ui.cloudflare_ready"))
+        self.setMinimumWidth(500)
+        self.setup_ui()
+    
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        
+        # Titolo
+        title = QLabel(t("ui.collection_ready"))
+        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #2ecc71; margin-bottom: 10px;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+        
+        # QR Code
+        try:
+            import qrcode
+            from io import BytesIO
+            
+            qr = qrcode.QRCode(version=1, box_size=10, border=2)
+            qr.add_data(self.url)
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Converti in QPixmap
+            buffer = BytesIO()
+            img.save(buffer, format='PNG')
+            buffer.seek(0)
+            
+            pixmap = QPixmap()
+            pixmap.loadFromData(buffer.read())
+            
+            qr_label = QLabel()
+            qr_label.setPixmap(pixmap.scaled(250, 250, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            qr_label.setAlignment(Qt.AlignCenter)
+            qr_label.setStyleSheet("margin: 10px; background: white; padding: 10px; border-radius: 5px;")
+            layout.addWidget(qr_label)
+            
+        except ImportError:
+            error_label = QLabel(t("cloudflare.qr_code_error"))
+            error_label.setStyleSheet("color: #e67e22; font-style: italic;")
+            error_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(error_label)
+        
+        # URL con sfondo
+        url_container = QLabel(self.url)
+        url_container.setStyleSheet("""
+            QLabel {
+                background-color: #34495e;
+                color: #ecf0f1;
+                padding: 15px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-family: 'Courier New', monospace;
+            }
+        """)
+        url_container.setAlignment(Qt.AlignCenter)
+        url_container.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        url_container.setWordWrap(True)
+        layout.addWidget(url_container)
+        
+        # Bottoni
+        button_layout = QHBoxLayout()
+        
+        copy_btn = QPushButton(t("ui.copy_url"))
+        copy_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+        """)
+        copy_btn.clicked.connect(self.copy_url)
+        button_layout.addWidget(copy_btn)
+        
+        open_btn = QPushButton(t("ui.open_web"))
+        open_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2ecc71;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #27ae60;
+            }
+        """)
+        open_btn.clicked.connect(self.open_browser)
+        button_layout.addWidget(open_btn)
+        
+        close_btn = QPushButton(t("ui.close_button"))
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #95a5a6;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #7f8c8d;
+            }
+        """)
+        close_btn.clicked.connect(self.accept)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        # Info
+        info = QLabel(t("ui.show_qr"))
+        info.setStyleSheet("color: #7f8c8d; font-size: 12px; margin-top: 10px;")
+        info.setWordWrap(True)
+        info.setAlignment(Qt.AlignCenter)
+        layout.addWidget(info)
+        
+        self.setLayout(layout)
+    
+    def copy_url(self):
+
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self.url)
+        
+        sender = self.sender()
+        
+        # Feedback visivo immediato
+        original_text = sender.text()
+        
+        try:
+            sender.setText(t("copy_btn"))
+            sender.setStyleSheet("""
+                QPushButton {
+                    background-color: #27ae60;
+                    color: white;
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 5px;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+            """)
+            
+            # Ripristina dopo 2 secondi SOLO se il dialog è ancora aperto
+            QTimer.singleShot(2000, lambda: self._restore_button_safe(sender, original_text))
+        except RuntimeError:
+            # Se il bottone è già stato eliminato, ignora
+            pass
+
+
+    def _restore_button_safe(self, button, original_text):
+        """Helper method per ripristinare il bottone in modo sicuro."""
+        try:
+            # Controlla se il widget esiste ancora
+            if button and button.isVisible():
+                button.setText(original_text)
+                button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #3498db;
+                        color: white;
+                        padding: 10px 20px;
+                        border: none;
+                        border-radius: 5px;
+                        font-size: 14px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #2980b9;
+                    }
+                """)
+        except (RuntimeError, AttributeError):
+            # Widget è stato eliminato, ignora silenziosamente
+            pass
+
+
+    def open_browser(self):
+        """Apri l'URL nel browser."""
+        import webbrowser
+        webbrowser.open(self.url)
 
 
 class MainWindow(QMainWindow):
@@ -141,9 +588,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         # ✅ VALIDA DATABASE ALL'AVVIO
-        print("\n" + "=" * 70)
-        print("🔧 STARTUP: Validazione Database")
-        print("=" * 70)
+        #print("\n" + "=" * 70)
+        #print("🔧 STARTUP: Validazione Database")
+        #print("=" * 70)
 
         db_manager = DatabaseManager()
         if db_manager.connect():
@@ -151,15 +598,17 @@ class MainWindow(QMainWindow):
             db_manager.close()
         else:
             QMessageBox.critical(
-                self, "❌ Errore Database", "Impossibile connettersi al database"
+                self,
+                t("error.db_connection_failed_title"),
+                t("error.db_connection_failed_body"),
             )
             return
         self.db = DatabaseManager(log_callback=print)  # Usiamo print per i log
         if not self.db.connect():
             QMessageBox.critical(
                 self,
-                "Errore DB Manager",
-                "Impossibile connettersi al Database Manager. La wishlist non funzionerà.",
+                t("error.db_manager_connection_failed_title"),
+                t("error.db_manager_connection_failed_body"),
             )
         self.wishlist_manager = WishlistManager(self.db)
         self.setWindowTitle(t("ui.window_title"))
@@ -206,24 +655,58 @@ class MainWindow(QMainWindow):
         # ================================================================
         self.bot_thread = None
         self.scraper_thread = None
+        self.channel_loader_thread = None
         self.found_cards = []
         self.collection_loaded = False
         self.active_toasters = []
-        # Structure pour stocker les CardWidget et leurs métadonnées pour le filtrage
-        # {set_code: {'widgets': [(widget, card_name, rarity, quantity, card_number), ...], 'layout': QGridLayout}}
+        self.web_viewer_btn = None
+
+        self.tunnel_btn = None
+        self.tunnel_thread = None
         self.collection_card_widgets = {}
         from typing import Optional, Dict
 
         self.current_account_id = None  # Optional[int]
         self.inventory_map = {}
-        self.wishlist_map = {}  # Dict[int, bool]        # Setup UI
+        self.wishlist_map = {}
+        self.channel_list_widget = QWidget()
+        self.channel_list_layout = QVBoxLayout(self.channel_list_widget)
+        self.channel_list_layout.setContentsMargins(10, 10, 10, 10)
+        self.channel_list_layout.setSpacing(5)
+        self.channel_list_layout.addWidget(
+            QLabel(t("ui.channel_available"))
+        )
+        self.channel_list_layout.addStretch()
         self.setup_ui()
-        self.set_background_image("gui/background.png")
+        #self.set_background_image("gui/background.png")
         # Load settings
         self.load_settings()
         # Setup system tray
+        if self.token_input.text().strip():
+            self.start_channel_loader()
         self.setup_system_tray()
         self.force_quit = False
+
+    # ui_main_window.py (dentro MainWindow)
+    def start_channel_loader(self):
+        """Avvia il thread leggero per caricare la lista dei canali dal bot."""
+        token = self.token_input.text().strip()
+        if not token:
+            return
+
+        # Evita il doppio avvio
+        if (
+            hasattr(self, "channel_loader_thread")
+            and self.channel_loader_thread
+            and self.channel_loader_thread.isRunning()
+        ):
+            return
+
+        # Crea e avvia il thread di caricamento canali
+        self.channel_loader_thread = DiscordChannelLoaderThread(token)
+        self.channel_loader_thread.channels_ready_signal.connect(self.on_channels_ready)
+        self.channel_loader_thread.log_signal.connect(self.append_bot_log)
+        self.channel_loader_thread.start()
 
     def create_image_tooltip(self, blob_data, text_fallback=""):
         """
@@ -242,7 +725,7 @@ class MainWindow(QMainWindow):
             return f'<html><img src="data:image/jpeg;base64,{b64_data}"></html>'
 
         except Exception as e:
-            print(f"⚠️ Errore creazione tooltip: {e}")
+            #print(f"⚠️ Errore creazione tooltip: {e}")
             return text_fallback  # Fallback al testo in caso di errore
 
     def add_found_card(self, card_data):
@@ -263,7 +746,7 @@ class MainWindow(QMainWindow):
                 + str(card_data.get("card_number", "")),
                 card_data.get("rarity", ""),
                 card_data.get("account_name", ""),
-                str(card_data.get("similarity", 0.0))[:5] + "%",
+                t("misc.similarity_percent", similarity=str(card_data.get("similarity", 0.0))[:5]),
             ]
 
             for col_idx, value in enumerate(columns):
@@ -271,7 +754,15 @@ class MainWindow(QMainWindow):
                 self.cards_table.setItem(row, col_idx, item)
 
         except Exception as e:
-            self.log_callback(f"❌ Errore aggiunta carta: {e}")
+            self.log_callback(f"{t("ui.card_error")} {e}")
+
+    def setup_accounts_tab(self):
+        """Configura il tab degli account (NUOVO)."""
+        # Crea l'istanza della nuova scheda
+        self.accounts_tab_widget = AccountsTab(self)  # <-- Crea l'attributo qui
+
+        # Aggiungi il widget al QTabWidget
+        self.tabs.addTab(self.accounts_tab_widget, t("ui.accounts_tab_with_icon"))
 
     def setup_ui(self):
         """Configura l'interfaccia utente."""
@@ -284,34 +775,44 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         main_layout.addWidget(self.tabs)
 
-        # Tab 1: Discord Bot
+        # Tab 2: Discord Bot
         self.setup_bot_tab()
 
-        # Tab 2: Cards Found
+        # Tab 3: Cards Found
         self.setup_cards_found_tab()
 
+        # Tab 4: Collection
         self.setup_collection_tab()
         self.load_accounts_from_database()
 
-        # Tab 3: Database Setup
+        # ✅ Tab 1: Accounts (NUOVO)
+        self.setup_accounts_tab()
+
+        # Tab 5: Database Setup
         self.setup_database_tab()
 
-        # Tab 4: Statistics
+        # Tab 6: Statistics
         self.setup_stats_tab()
 
-        # Tab 5: Settings
+        # Tab 7: Settings
         self.setup_settings_tab()
         self.tabs.currentChanged.connect(self.on_tab_changed)
 
     def get_all_accounts(self):
-        """Recupera tutti gli account ordinati per nome."""
+        """
+        Recupera tutti gli account ordinati per nome.
+        ✅ CORREZIONE: Seleziona device_account e lo aliasa a account_id per la compatibilità.
+        """
         try:
+            # self.cursor è il cursore dalla connessione di MainWindow
             self.cursor.execute(
-                "SELECT account_id, account_name FROM accounts ORDER BY account_name"
+                "SELECT device_account AS account_id, account_name FROM accounts ORDER BY account_name"
             )
+            # Restituisce una lista di tuple [(device_id, display_name), ...]
             return self.cursor.fetchall()
         except Exception as e:
-            print(f"❌ Errore recupero account: {e}")
+            # Registra l'errore che viene visualizzato
+            #print(f"❌ Errore recupero account: {e}")
             return []
 
     def load_accounts_from_database(self):
@@ -323,7 +824,8 @@ class MainWindow(QMainWindow):
                 with sqlite3.connect(DB_FILENAME) as conn:
                     cursor = conn.cursor()
                     cursor.execute(
-                        "SELECT account_id, account_name FROM accounts ORDER BY account_name"
+                        # ✅ CORREZIONE: Seleziona device_account e lo aliasa a account_id
+                        "SELECT device_account AS account_id, account_name FROM accounts ORDER BY account_name"
                     )
                     accounts = cursor.fetchall()
 
@@ -331,13 +833,14 @@ class MainWindow(QMainWindow):
             while self.collection_account_combo.count() > 1:
                 self.collection_account_combo.removeItem(1)
 
-            # Aggiungi account (memorizza account_id come userData)
+            # Aggiungi account (memorizza l'alias 'account_id' come userData)
             for account_id, account_name in accounts:
                 self.collection_account_combo.addItem(account_name, account_id)
 
-            print(f"✅ Caricati {len(accounts)} account")
+            #print(f"✅ Caricati {len(accounts)} account")
         except Exception as e:
-            print(f"❌ Errore: {e}")
+            # Questo è l'errore che vedi se la SELECT fallisce qui
+            print(f"❌ Errore caricamento account: {e}")
 
     def open_cloudflare_dialog(self):
         """Apre il dialog per configurare Cloudflare"""
@@ -346,11 +849,10 @@ class MainWindow(QMainWindow):
             password = dialog.password
             if password:
                 # Mostra info su come usare Cloudflare
-                info_msg = (
-                    "✅ Password configured!\n\n"
-                    "The public URL will be password protected."
+                info_msg = t("cloudflare.password_configured_body")
+                QMessageBox.information(
+                    self, t("cloudflare.password_configured_title"), info_msg
                 )
-                QMessageBox.information(self, "ℹ️ Cloudflare Setup", info_msg)
 
     # =========================================================================
     # FLASK WEB SERVER
@@ -358,7 +860,12 @@ class MainWindow(QMainWindow):
 
     def toggle_web_server(self):
         """Avvia o ferma il server web Flask."""
-        if not hasattr(self, "flask_thread") or not self.flask_thread.isRunning():
+        # ✅ CORRETTO: controlla prima se flask_thread è None
+        if (
+            not hasattr(self, "flask_thread")
+            or self.flask_thread is None
+            or not self.flask_thread.isRunning()
+        ):
             self.start_web_server()
         else:
             self.stop_web_server()
@@ -368,39 +875,49 @@ class MainWindow(QMainWindow):
         try:
             if not os.path.exists(DB_FILENAME):
                 QMessageBox.warning(
-                    self, "Warning", "Database not found. Please run the scraper first."
+                    self, t("warning.title"), t("warning.db_not_found")
                 )
                 return
 
-            # Crea e avvia thread Flask
             self.flask_thread = FlaskServerThread()
             self.flask_thread.log_signal.connect(self.on_flask_log)
             self.flask_thread.started_signal.connect(self.on_flask_started)
             self.flask_thread.stopped_signal.connect(self.on_flask_stopped)
             self.flask_thread.error_signal.connect(self.on_flask_error)
 
-            # Disabilita pulsante durante l'avvio
-            self.web_viewer_btn.setEnabled(False)
-            self.web_viewer_btn.setText("🌐 Starting Server...")
+            # ✅ Controlla se il bottone esiste prima di usarlo
+            if hasattr(self, "web_viewer_btn") and self.web_viewer_btn is not None:
+                self.web_viewer_btn.setEnabled(False)
+                self.web_viewer_btn.setText(t("ui.starting_server"))
 
-            # Avvia thread (NON blocca la GUI)
             self.flask_thread.start()
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to start web server: {str(e)}")
-            self.web_viewer_btn.setEnabled(True)
+            import traceback
+
+            error_msg = (
+                f"{t('ui.failed_start_web_server')}: {str(e)}\n{traceback.format_exc()}"
+            )
+            QMessageBox.critical(self, t("error.title"), error_msg)
+
+            # ✅ Controlla se il bottone esiste prima di usarlo
+            if hasattr(self, "web_viewer_btn") and self.web_viewer_btn is not None:
+                self.web_viewer_btn.setEnabled(True)
 
     def stop_web_server(self):
         """Ferma il server web Flask."""
         try:
-            if hasattr(self, "flask_thread") and self.flask_thread.isRunning():
+            # ✅ Già corretto nel tuo codice
+            if (
+                hasattr(self, "flask_thread")
+                and self.flask_thread
+                and self.flask_thread.isRunning()
+            ):
                 self.web_viewer_btn.setEnabled(False)
-                self.web_viewer_btn.setText("🌐 Stopping Server...")
-
-                # Ferma il thread (NON blocca la GUI)
+                self.web_viewer_btn.setText(t("ui.stop_server"))
                 self.flask_thread.stop_server()
         except Exception as e:
-            QMessageBox.warning(self, "Warning", f"Error stopping server: {str(e)}")
+            QMessageBox.warning(self, t("warning.title"), f"{t('ui.error_stopping_server')}: {str(e)}")
             self.on_flask_stopped()
 
     def on_flask_log(self, message):
@@ -410,36 +927,53 @@ class MainWindow(QMainWindow):
 
     def on_flask_started(self):
         """Chiamato quando Flask è avviato."""
-        self.web_viewer_btn.setEnabled(True)
-        self.web_viewer_btn.setText("🛑 Stop Web Viewer")
-        self.web_viewer_btn.setStyleSheet(
-            "QPushButton { background-color: #e74c3c; color: white; padding: 5px 15px; font-weight: bold; }"
-        )
+        # ✅ Controlla se il bottone esiste prima di usarlo
+        if hasattr(self, "web_viewer_btn") and self.web_viewer_btn is not None:
+            self.web_viewer_btn.setEnabled(True)
+            self.web_viewer_btn.setText(t("ui.stop_web_viewer"))
+            self.web_viewer_btn.setStyleSheet(
+                """
+                QPushButton {
+                    background-color: #e74c3c;
+                    color: white;
+                    padding: 5px 15px;
+                    font-weight: bold;
+                }
+            """
+            )
 
-        # Apri browser dopo 1 secondo
+        # Apri il browser dopo 1 secondo
         QTimer.singleShot(1000, self.open_web_browser)
 
+        # Mostra il messaggio di successo
         QMessageBox.information(
             self,
-            t("ui.web_server_started"),
-            t("ui.web_server_running_message")
-            + "\n\n"
+            t("ui.webserver_started"),
+            t("ui.webserver_running_message")
             + t("ui.url_label")
-            + " http://localhost:5000\n\n"
+            + "http://localhost:5000"
             + t("ui.browser_will_open"),
         )
 
     def on_flask_stopped(self):
         """Chiamato quando Flask è fermato."""
-        self.web_viewer_btn.setEnabled(True)
-        self.web_viewer_btn.setText("🖥️ Open Web Viewer")
-        self.web_viewer_btn.setStyleSheet(
-            "QPushButton { background-color: #27ae60; color: white; padding: 5px 15px; }"
-        )
+        # ✅ Controlla se il bottone esiste prima di usarlo
+        if hasattr(self, "web_viewer_btn") and self.web_viewer_btn is not None:
+            self.web_viewer_btn.setEnabled(True)
+            self.web_viewer_btn.setText(t("ui.open_web_viewer"))
+            self.web_viewer_btn.setStyleSheet(
+                """
+                QPushButton {
+                    background-color: #27ae60;
+                    color: white;
+                    padding: 5px 15px;
+                }
+            """
+            )
 
     def on_flask_error(self, error_message):
         """Chiamato in caso di errore Flask."""
-        QMessageBox.critical(self, "Flask Server Error", error_message)
+        QMessageBox.critical(self, t("ui.flask_server_error"), error_message)
         self.on_flask_stopped()
 
     def open_web_browser(self):
@@ -449,7 +983,7 @@ class MainWindow(QMainWindow):
         try:
             webbrowser.open("http://localhost:5000")
         except Exception as e:
-            print(f"Could not open browser: {e}")
+            print(f"{t("ui.cannot_open")} {e}")
 
     def on_wishlist_changed(self, card_id, is_wishlisted):
         """Gestisce il cambio di stato della wishlist."""
@@ -472,7 +1006,216 @@ class MainWindow(QMainWindow):
 
                 conn.commit()
         except Exception as e:
-            print(f"Error updating wishlist: {e}")
+            print(f"{t("ui.error_wishlist")} {e}")
+
+    # ui_main_window.py (dentro MainWindow)
+    def toggle_channel_selection(self, channel_id: int, checked: bool):
+        """Aggiunge o rimuove un Channel ID dalla lista di selezione e salva."""
+        if checked:
+            self.selected_channel_ids.add(channel_id)
+        else:
+            self.selected_channel_ids.discard(channel_id)
+
+        self.save_settings()
+
+    def start_bot(self):
+        """
+        Avvia il Discord bot principale.
+        Verifica il Token e la selezione dei canali (dopo che sono stati caricati).
+        """
+        token = self.token_input.text().strip()
+
+        # 1. Validazione base: Il Token è l'unico campo obbligatorio per tentare l'avvio
+        if not token:
+            QMessageBox.warning(self, t("error.title"), t("ui.provide_token"))
+            return
+
+        # 2. Recupera la lista degli ID selezionati (dal set salvato/caricato)
+        channel_ids = list(self.selected_channel_ids)
+
+        # 3. Validazione Selezione Canali: Deve esserci almeno 1 canale SE LA LISTA è stata caricata.
+        # Se il bot è alla prima connessione, channel_ids sarà vuota e la GUI sarà popolata.
+        if (
+            not channel_ids
+            and hasattr(self, "available_channels")
+            and self.available_channels
+        ):
+            QMessageBox.warning(
+                self, t("error.title"), t("warning.select_one_channel")
+            )
+            return
+
+        # 4. Ferma il loader leggero (se attivo)
+        if (
+            hasattr(self, "channel_loader_thread")
+            and self.channel_loader_thread
+            and self.channel_loader_thread.isRunning()
+        ):
+            self.channel_loader_thread.quit()
+            self.channel_loader_thread.wait(500)
+
+        # 5. Avvia il thread principale
+
+        # Passa la LISTA di ID interi selezionati al thread (può essere vuota solo al primo avvio)
+        self.bot_thread = DiscordBotThread(token, channel_ids)
+
+        # ✅ NUOVO COLLEGAMENTO: Riceve i canali disponibili dal bot (per popolare/ri-popolare la UI)
+        self.bot_thread.channels_ready_signal.connect(self.on_channels_ready)
+
+        # Collegamenti standard
+        self.bot_thread.log_signal.connect(self.append_bot_log)
+        self.bot_thread.progress_signal.connect(self.on_bot_progress)
+        self.bot_thread.trade_signal.connect(self.add_trade_to_table)
+        self.bot_thread.status_signal.connect(self.update_bot_status)
+        self.bot_thread.card_found_signal.connect(self.on_card_found)
+
+        self.bot_thread.start()
+
+        self.start_bot_btn.setEnabled(False)
+        self.stop_bot_btn.setEnabled(True)
+        self.bot_status_label.setText(t("bot_status.starting"))
+
+        self.save_settings()
+
+    # ui_main_window.py (dentro MainWindow)
+    def create_collapsible_channel_group(self):
+        """Crea una sezione espandibile/collassabile per la lista dei canali."""
+
+        # === 1. IL CONTENITORE PRINCIPALE ===
+        main_container = QWidget()
+        main_layout = QVBoxLayout(main_container)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # === 2. PULSANTE DI CONTROLLO (Toggle Button) ===
+        self.channel_toggle_btn = QToolButton(self)
+        self.channel_toggle_btn.setText(t("ui.channel_available_text"))
+        self.channel_toggle_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.channel_toggle_btn.setArrowType(Qt.RightArrow)
+        self.channel_toggle_btn.setStyleSheet(
+            """
+            QToolButton { 
+                background: #3a3a3a; /* Dark background */
+                border: 1px solid #555; 
+                padding: 5px; 
+                text-align: left; 
+                font-weight: bold; 
+            }
+        """
+        )
+        self.channel_toggle_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        # === 3. CONTENUTO SCORREVOLE (Utilizza il widget esistente) ===
+
+        # Crea l'area scrollabile e assegna il widget che contiene il layout esistente
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        # 💥 UTILIZZA IL WIDGET ESISTENTE CHE CONTIENE self.channel_list_layout
+        scroll_area.setWidget(self.channel_list_widget)
+
+        scroll_area.setStyleSheet("border: 1px solid #555; border-top: none;")
+        scroll_area.setFixedHeight(150)
+
+        self.channel_content_scroll_area = scroll_area
+
+        # === 4. LOGICA DI COLLASSO ===
+        # Inizialmente collassato
+        self.channel_content_scroll_area.setVisible(False)
+
+        def toggle_section(checked):
+            # Mostra/nascondi l'area scrollabile (il contenuto)
+            self.channel_content_scroll_area.setVisible(checked)
+            # Cambia l'icona della freccia
+            self.channel_toggle_btn.setArrowType(
+                Qt.DownArrow if checked else Qt.RightArrow
+            )
+
+        self.channel_toggle_btn.setCheckable(True)
+        self.channel_toggle_btn.setChecked(False)  # Inizia chiuso
+        self.channel_toggle_btn.toggled.connect(toggle_section)
+
+        # Aggiungi al layout principale
+        main_layout.addWidget(self.channel_toggle_btn)
+        main_layout.addWidget(self.channel_content_scroll_area)
+
+        return main_container
+
+    def on_channels_ready(self, channels_data: Dict[int, str]):
+        """
+        Riceve la lista dei canali disponibili dal bot e popola la UI con le Checkbox.
+        self.channel_list_layout è ora persistente.
+        ✅ FIX: Verifica che il layout non sia stato deletato
+        """
+        # 🔴 FIX #1: CONTROLLA CHE IL LAYOUT ESISTA E NON SIA DELETATO
+        if not hasattr(self, "channel_list_layout"):
+            #print("⚠️ Channel list layout non trovato")
+            return
+
+        # 🔴 FIX #2: VERIFICA CHE IL LAYOUT NON SIA STATO DISTRUTTO
+        try:
+            # Tenta di accedere a una proprietà del layout per verificare che sia valido
+            _ = self.channel_list_layout.count()
+        except RuntimeError:
+            #print("⚠️ Channel list layout è stato distrutto, skip update")
+            return
+
+        # 💥 PULIZIA SICURA DEL LAYOUT 💥
+        while self.channel_list_layout.count() > 0:
+            item = self.channel_list_layout.takeAt(0)
+            if item is None:
+                break
+
+            # Rimuovi widget
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+            # Rimuovi spacer
+            elif item.spacerItem():
+                pass  # Gli spacer non hanno bisogno di cleanup esplicito
+
+        self.available_channels = channels_data
+
+        if not channels_data:
+            self.channel_list_layout.addWidget(
+                QLabel(t("ui.no_channel_found"))
+            )
+            return
+
+        # Ordina per nome del canale
+        sorted_channels = sorted(
+            channels_data.items(), key=lambda item: item[1].lower()
+        )
+
+        # Crea una Checkbox per ogni canale
+        for channel_id, channel_name in sorted_channels:
+            cb = QCheckBox(t("channel.checkbox_label", channel_name=channel_name, channel_id=channel_id))
+
+            # Carica lo stato salvato (se l'ID è nella lista salvata)
+            if channel_id in self.selected_channel_ids:
+                cb.setChecked(True)
+
+            # Connetti il segnale per salvare lo stato al click
+            cb.toggled.connect(
+                lambda checked, cid=channel_id: self.toggle_channel_selection(
+                    cid, checked
+                )
+            )
+            self.channel_list_layout.addWidget(cb)
+
+        # Aggiungi stretch finale
+        self.channel_list_layout.addStretch()
+
+        #self.append_bot_log(
+        #    f"✅ Caricati {len(channels_data)} canali dal server. Seleziona quelli da scansionare."
+        #)
+        self.save_settings()
+
+    def update_channel_count_label(self):
+        """Aggiorna il contatore dei canali configurati nella UI."""
+        if hasattr(self, "channel_configs") and hasattr(self, "channel_count_label"):
+            count = len(self.channel_configs)
+            self.channel_count_label.setText(t("ui.channels_configured", count=count))
 
     def setup_bot_tab(self):
         """Configura il tab del Discord bot."""
@@ -480,26 +1223,29 @@ class MainWindow(QMainWindow):
         bot_layout = QVBoxLayout(bot_widget)
 
         # Configuration Group
-        config_group = QGroupBox("🔧 " + t("ui.configuration"))
+        config_group = QGroupBox(t("ui.config_group_with_icon"))
         config_layout = QVBoxLayout(config_group)
 
         # Token
         token_layout = QHBoxLayout()
-        token_layout.addWidget(QLabel("Bot Token:"))
+        token_layout.addWidget(QLabel(t("ui.bot_token_lable")))
         self.token_input = QLineEdit()
         self.token_input.setEchoMode(QLineEdit.Password)
-        self.token_input.setPlaceholderText("Enter your Discord bot token")
+        self.token_input.setPlaceholderText(t("ui.enter_discord_token"))
         token_layout.addWidget(self.token_input)
         config_layout.addLayout(token_layout)
         self.token_input.textChanged.connect(self.save_settings)
-        # Channel ID
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel(t("ui.channel_id")))
-        self.channel_input = QLineEdit()
-        self.channel_input.setPlaceholderText("Enter the Discord channel ID")
-        channel_layout.addWidget(self.channel_input)
-        config_layout.addLayout(channel_layout)
-        self.channel_input.textChanged.connect(self.save_settings)
+
+        # ✅ AGGIUNGI SOLO IL COLLAPSIBLE (che contiene già lo scroll_area)
+        collapsible_channel_section = self.create_collapsible_channel_group()
+        config_layout.addWidget(collapsible_channel_section)
+
+        # ❌ RIMUOVI QUESTO BLOCCO INTERO:
+        # scroll_area = QScrollArea()
+        # scroll_area.setWidgetResizable(True)
+        # scroll_area.setWidget(self.channel_list_widget)
+        # config_layout.addWidget(scroll_area)
+
         # Buttons
         button_layout = QHBoxLayout()
         self.start_bot_btn = QPushButton(t("ui.start_bot"))
@@ -519,13 +1265,12 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.stop_bot_btn)
 
         self.recover_history_btn = QPushButton(t("ui.recover_history"))
-
         config_layout.addLayout(button_layout)
 
         bot_layout.addWidget(config_group)
 
         # Status Group
-        status_group = QGroupBox("📊 " + t("ui.status"))
+        status_group = QGroupBox(t("ui.status_group_with_icon"))
         status_layout = QVBoxLayout(status_group)
         self.bot_status_label = QLabel(t("bot_status.stopped"))
         self.bot_status_label.setStyleSheet(
@@ -545,7 +1290,7 @@ class MainWindow(QMainWindow):
         bot_layout.addWidget(progress_group)
 
         # Log
-        log_group = QGroupBox("📝 " + t("ui.log"))
+        log_group = QGroupBox(t("ui.log_group_with_icon"))
         log_layout = QVBoxLayout(log_group)
         self.bot_log_text = QTextEdit()
         self.bot_log_text.setReadOnly(True)
@@ -560,8 +1305,8 @@ class MainWindow(QMainWindow):
         log_layout.addWidget(self.bot_log_text)
         bot_layout.addWidget(log_group)
 
-        # Trades Table CON MINIATURE
-        trades_group = QGroupBox("📦 " + t("ui.recent_trades"))
+        # Trades Table
+        trades_group = QGroupBox(t("ui.recent_trades_group_with_icon"))
         trades_layout = QVBoxLayout(trades_group)
         self.trades_table = QTableWidget()
         self.trades_table.setColumnCount(5)
@@ -576,12 +1321,8 @@ class MainWindow(QMainWindow):
         )
         self.trades_table.horizontalHeader().setStretchLastSection(True)
         self.trades_table.setAlternatingRowColors(True)
-
-        # Imposta dimensioni colonne
-        self.trades_table.setColumnWidth(0, 80)  # Preview column
-        self.trades_table.verticalHeader().setDefaultSectionSize(70)  # Altezza righe
-
-        # Abilita interazioni
+        self.trades_table.setColumnWidth(0, 80)
+        self.trades_table.verticalHeader().setDefaultSectionSize(70)
         self.trades_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.trades_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.trades_table.setStyleSheet(
@@ -595,7 +1336,7 @@ class MainWindow(QMainWindow):
         trades_layout.addWidget(self.trades_table)
         bot_layout.addWidget(trades_group)
 
-        self.tabs.addTab(bot_widget, "🤖 " + t("ui.discord_bot"))
+        self.tabs.addTab(bot_widget, t("ui.discord_bot_tab_with_icon"))
 
     def setup_cards_found_tab(self):
         """Configura il tab delle carte trovate (Refactored)."""
@@ -603,7 +1344,7 @@ class MainWindow(QMainWindow):
         self.cards_found_tab_widget = CardsFoundTab(self)
 
         # Aggiungi il widget al QTabWidget
-        self.tabs.addTab(self.cards_found_tab_widget, "🎴 " + t("ui.cards_found"))
+        self.tabs.addTab(self.cards_found_tab_widget, t("ui.cards_found_tab_with_icon"))
 
     def _find_screenshot_for_message(self, account_name, message_id):
         """Trova il file screenshot per un messaggio specifico."""
@@ -626,7 +1367,7 @@ class MainWindow(QMainWindow):
                     if os.path.exists(full_path):
                         return full_path
         except Exception as e:
-            print(f"⚠️ Errore ricerca screenshot: {e}")
+            print(f"{t("ui.screenshot_error")} {e}")
 
         return ""
 
@@ -657,9 +1398,9 @@ class MainWindow(QMainWindow):
             # Mostra progress dialog
             progress = QProgressBar()
             progress_dialog = QMessageBox(self)
-            progress_dialog.setWindowTitle("Downloading Cloudflared")
+            progress_dialog.setWindowTitle(t("ui.download_cloudflare"))
             progress_dialog.setText(
-                "Downloading cloudflared.exe...\n\nThis may take a few minutes (~50 MB)."
+                t("ui.downloading_cloudflared")
             )
             progress_dialog.setStandardButtons(QMessageBox.NoButton)
             progress_dialog.layout().addWidget(progress, 1, 1)
@@ -675,11 +1416,11 @@ class MainWindow(QMainWindow):
                 QApplication.processEvents()
 
             # Download nel path temporaneo
-            self.append_bot_log(f"📥 Downloading cloudflared from GitHub...")
+            #self.append_bot_log(f"📥 Downloading cloudflared from GitHub...")
             urlretrieve(cloudflared_url, temp_path, reporthook=report_progress)
 
             # Copia nella cartella dell'app e rinomina
-            self.append_bot_log(f"📂 Installing to: {final_path}")
+            #self.append_bot_log(f"📂 Installing to: {final_path}")
             shutil.copy2(temp_path, final_path)
 
             # Rimuovi file temporaneo
@@ -693,10 +1434,10 @@ class MainWindow(QMainWindow):
             # ⬇️ CHIEDI SE RIAVVIARE L'APP ⬇️
             reply = QMessageBox.question(
                 self,
-                "Download Complete",
-                "Cloudflared installed successfully!\n\n"
-                "The application needs to restart to use Cloudflare Tunnel.\n\n"
-                "Restart now?",
+                t("ui.download_completed"),
+                t("ui.installed_successfuly"),
+                t("ui.need_restart"),
+                t("ui.restart_now"),
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes,
             )
@@ -706,8 +1447,8 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.information(
                     self,
-                    "Restart Required",
-                    "Please restart the application manually to use Cloudflare Tunnel.",
+                    t("ui.restart_needed"),
+                    t("ui.restart_now_app"),
                 )
 
         except Exception as e:
@@ -720,17 +1461,18 @@ class MainWindow(QMainWindow):
 
             QMessageBox.critical(
                 self,
-                "Download Failed",
-                f"Failed to download cloudflared: {str(e)}\n\n"
-                f"Please download manually from:\n"
-                f"https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/\n\n"
-                f"And place 'cloudflared.exe' in:\n{app_dir}",
+                t("download.failed_title"),
+                t(
+                    "download.cloudflared_failed",
+                    e=str(e),
+                    app_dir=app_dir
+                ),
             )
 
     def restart_application(self):
         """Riavvia l'applicazione."""
         try:
-            self.append_bot_log("🔄 Restarting application...")
+            self.append_bot_log(t("app.restarting"))
 
             # Salva le impostazioni prima di riavviare
             self.save_settings()
@@ -786,39 +1528,91 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(
                 self,
-                "Restart Failed",
-                f"Failed to restart application: {str(e)}\n\n"
-                f"Please restart manually.",
+                t("app.restart_failed_title"),
+                t("app.restart_failed_body", e=str(e)),
             )
 
+    def open_info_dialog(self):
+        """
+        Apre un dialogo separato per mostrare le "Extra Info" (crediti e link).
+        """
+        # Creiamo un QDialog al volo
+        dialog = QDialog(self)
+        dialog.setWindowTitle(t("credits.dialog_title"))
+        dialog.setMinimumSize(600, 450)
+        dialog.setModal(True)
+
+        layout = QVBoxLayout(dialog)
+
+        info_text = QTextBrowser()
+        info_text.setReadOnly(True)
+        info_text.setOpenExternalLinks(True)
+        info_text.setStyleSheet(
+            """
+            QTextEdit {
+                background-color: #2a2a2a; border: 1px solid #555;
+                border-radius: 5px; padding: 15px; font-size: 11px; line-height: 1.6;
+            }
+        """
+        )
+
+        # Incolliamo qui il contenuto HTML che abbiamo rimosso
+        info_text.setHtml(t("credits.html_content"))
+
+        layout.addWidget(info_text)
+
+        # Pulsante OK
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+
+        dialog.exec_()
+
+    def select_bot_folder(self):
+        """Apre un dialogo per selezionare la cartella del Bot."""
+        # Legge il percorso attuale, se esiste, per aprire il dialogo lì
+        current_path = self.bot_folder_input.text()
+        if not os.path.isdir(current_path):
+            current_path = os.path.expanduser("~")  # Fallback alla home
+
+        folder_path = QFileDialog.getExistingDirectory(
+            self, t("ui.select_folder_bot"), current_path
+        )
+
+        if folder_path:
+            self.bot_folder_input.setText(folder_path)
+            # Il segnale textChanged si occuperà di salvare
 
     def open_app_data_folder(self):
         """
-        Apre la cartella dei dati dell'applicazione (AppData) 
+        Apre la cartella dei dati dell'applicazione (AppData)
         nel file explorer del sistema operativo.
         """
         try:
             # Usiamo DB_FILENAME come riferimento per trovare la cartella
             # get_app_data_path() ci dà il percorso completo del file
             app_data_dir = os.path.dirname(get_app_data_path(DB_FILENAME))
-            
-            if not os.path.exists(app_data_dir):
-                QMessageBox.warning(self, "Errore", "La cartella AppData non è stata ancora creata.")
-                return
-            
-            print(f"ℹ️ Apertura cartella dati: {app_data_dir}")
-            
-            # Usa il metodo nativo del SO per aprire la cartella
-            if sys.platform == 'win32':
-                os.startfile(app_data_dir)
-            elif sys.platform == 'darwin': # macOS
-                subprocess.Popen(['open', app_data_dir])
-            else: # Linux
-                subprocess.Popen(['xdg-open', app_data_dir])
-                
-        except Exception as e:
-            QMessageBox.critical(self, "Errore", f"Impossibile aprire la cartella: {e}")
 
+            if not os.path.exists(app_data_dir):
+                QMessageBox.warning(self, t("warning.title"), t("ui.app_data_error"))
+                return
+
+            #print(f"ℹ️ Apertura cartella dati: {app_data_dir}")
+
+            # Usa il metodo nativo del SO per aprire la cartella
+            if sys.platform == "win32":
+                os.startfile(app_data_dir)
+            elif sys.platform == "darwin":  # macOS
+                subprocess.Popen(["open", app_data_dir])
+            else:  # Linux
+                subprocess.Popen(["xdg-open", app_data_dir])
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                t("error.folder_open_failed_title"),
+                t("error.folder_open_failed_body", e=e),
+            )
 
     def setup_collection_tab(self):
         """
@@ -829,7 +1623,7 @@ class MainWindow(QMainWindow):
         self.collection_tab_widget = CollectionTab(self)
 
         # Aggiungi il widget al QTabWidget
-        self.tabs.addTab(self.collection_tab_widget, "📚 " + t("ui.collection"))
+        self.tabs.addTab(self.collection_tab_widget, t("ui.collection_tab_with_icon"))
 
     # =========================================================================
     # CLOUDFLARE TUNNEL
@@ -837,59 +1631,145 @@ class MainWindow(QMainWindow):
 
     def toggle_cloudflare_tunnel(self):
         """Avvia o ferma il tunnel Cloudflare."""
-        if not hasattr(self, "tunnel_thread") or not self.tunnel_thread.isRunning():
-            self.start_cloudflare_tunnel()
-        else:
+        # ✅ Usa tunnel_thread invece di cloudflare_thread
+        if (
+            hasattr(self, "tunnel_thread")
+            and self.tunnel_thread
+            and self.tunnel_thread.isRunning()
+        ):
             self.stop_cloudflare_tunnel()
+        else:
+            self.start_cloudflare_tunnel()
+
+    def on_cloudflare_url(self, url: str):
+        """Chiamato quando il tunnel è pronto con l'URL pubblico."""
+        if hasattr(self, 'tunnel_btn') and self.tunnel_btn is not None:
+            self.tunnel_btn.setEnabled(True)
+            self.tunnel_btn.setText(t("cloudflare.stop_tunnel_button"))
+            self.tunnel_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #e74c3c;
+                    color: white;
+                    padding: 5px 15px;
+                    font-weight: bold;
+                }
+            """)
+        
+        self.append_bot_log(t("cloudflare.public_url_log", url=url))
+        
+        # ✅ Mostra dialog con QR code e copy button
+        dialog = TunnelURLDialog(url, self)
+        dialog.exec_()
+
+
+    def on_cloudflare_log(self, message: str):
+        """Log dal tunnel Cloudflare."""
+        self.append_bot_log(t("cloudflare.log_prefix", message=message))
+
+    def on_cloudflare_error(self, error_message: str):
+        """Errore dal tunnel Cloudflare."""
+        QMessageBox.critical(self, t("cloudflare.tunnel_error_title"), error_message)
+
+        if hasattr(self, "tunnel_btn") and self.tunnel_btn is not None:
+            self.tunnel_btn.setEnabled(True)
+            self.tunnel_btn.setText(t("ui.start_tunnel"))
+
+    def on_cloudflare_stopped(self):
+        """Tunnel Cloudflare fermato."""
+        if hasattr(self, "tunnel_btn") and self.tunnel_btn is not None:
+            self.tunnel_btn.setEnabled(True)
+            self.tunnel_btn.setText(t("ui.start_tunnel"))
+            self.tunnel_btn.setStyleSheet("")
+
+        self.append_bot_log(f"✅ {t("ui.stop_tunnel")}")
+
+    def on_cloudflare_error(self, error_message: str):
+        """Chiamato in caso di errore."""
+        QMessageBox.critical(self, t("cloudflare.tunnel_error_title"), error_message)
+
+        if hasattr(self, "tunnel_btn") and self.tunnel_btn is not None:
+            self.tunnel_btn.setEnabled(True)
+            self.tunnel_btn.setText(t("ui.start_tunnel"))
+
+    def on_cloudflare_stopped(self):
+        """Chiamato quando il tunnel viene fermato."""
+        if hasattr(self, "tunnel_btn") and self.tunnel_btn is not None:
+            self.tunnel_btn.setEnabled(True)
+            self.tunnel_btn.setText(t("ui.start_tunnel"))
+            self.tunnel_btn.setStyleSheet(
+                """
+                QPushButton {
+                    background-color: #3498db;
+                    color: white;
+                    padding: 5px 15px;
+                }
+            """
+            )
+
+    def on_cloudflare_log(self, message: str):
+        """Riceve i log dal tunnel."""
+        print(t("cloudflare.log_prefix", message=message))
+
 
     def start_cloudflare_tunnel(self):
-        """Avvia il tunnel Cloudflare per esporre Flask pubblicamente."""
+        """Avvia il tunnel Cloudflare con auto-start Flask."""
         try:
-            # ⬇️ STEP 1: Verifica che cloudflared.exe esista ⬇️
-            if getattr(sys, "frozen", False):
-                cloudflared_path = os.path.join(sys._MEIPASS, "cloudflared.exe")
-            else:
-                cloudflared_path = os.path.join(os.getcwd(), "cloudflared.exe")
-
-            if not os.path.exists(cloudflared_path):
-                # Cloudflared non trovato - chiedi download
-                reply = QMessageBox.question(
-                    self,
-                    "Cloudflared Not Found",
-                    "Cloudflared is required to expose your app publicly.\n\n"
-                    "Would you like to download it now?\n\n"
-                    "(Download size: ~50 MB)",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.Yes,
-                )
-
-                if reply == QMessageBox.Yes:
-                    self.download_cloudflared()
-                else:
-                    self.append_bot_log(
-                        "⚠️ Cloudflare Tunnel cancelled - cloudflared not installed"
-                    )
-                return
-
-            # ⬇️ STEP 2: Verifica che Flask sia in esecuzione, altrimenti avvialo ⬇️
-            if not hasattr(self, "flask_thread") or not self.flask_thread.isRunning():
-                self.append_bot_log("🌐 Flask not running - starting automatically...")
-
-                # Avvia Flask
+            # ✅ AUTO-START Flask se non è in esecuzione
+            if (
+                not hasattr(self, "flask_thread")
+                or not self.flask_thread
+                or not self.flask_thread.isRunning()
+            ):
+                self.append_bot_log(t("ui.starting_cloudflare"))
                 self.start_web_server()
-
-                # Aspetta 3 secondi per Flask
-                QTimer.singleShot(3000, self._start_tunnel_after_flask)
+                # Aspetta 2 secondi che Flask sia pronto
+                QTimer.singleShot(2000, self._continue_cloudflare_start)
                 return
 
-            # ⬇️ STEP 3: Avvia il tunnel ⬇️
-            self._start_tunnel_now()
+            self._continue_cloudflare_start()
 
         except Exception as e:
-            QMessageBox.critical(
-                self, "Error", f"Failed to start Cloudflare Tunnel: {str(e)}"
+            import traceback
+
+            error_msg = (
+                f"Failed to start Cloudflare Tunnel: {str(e)}\n{traceback.format_exc()}"
             )
-            self.tunnel_btn.setEnabled(True)
+            QMessageBox.critical(self, t("error.title"), error_msg)
+
+            if hasattr(self, "tunnel_btn") and self.tunnel_btn is not None:
+                self.tunnel_btn.setEnabled(True)
+                self.tunnel_btn.setText(t("ui.start_tunnel"))
+
+    def _continue_cloudflare_start(self):
+        """Continua l'avvio di Cloudflare dopo che Flask è pronto."""
+        try:
+            from .cloudflare import CloudflareTunnelThread
+
+            self.tunnel_thread = CloudflareTunnelThread(local_port=5000)
+
+            # ✅ CORREZIONE: Usa url_ready_signal invece di url_signal
+            self.tunnel_thread.log_signal.connect(self.on_cloudflare_log)
+            self.tunnel_thread.url_ready_signal.connect(self.on_cloudflare_url)
+            self.tunnel_thread.stopped_signal.connect(self.on_cloudflare_stopped)
+            self.tunnel_thread.error_signal.connect(self.on_cloudflare_error)
+
+            if hasattr(self, "tunnel_btn") and self.tunnel_btn is not None:
+                self.tunnel_btn.setEnabled(False)
+                self.tunnel_btn.setText(t("ui.starting_cf"))
+
+            self.tunnel_thread.start()
+
+        except Exception as e:
+            import traceback
+
+            error_msg = (
+                f"Failed to start Cloudflare Tunnel: {str(e)}\n{traceback.format_exc()}"
+            )
+            QMessageBox.critical(self, t("error.title"), error_msg)
+
+            if hasattr(self, "tunnel_btn") and self.tunnel_btn is not None:
+                self.tunnel_btn.setEnabled(True)
+                self.tunnel_btn.setText(t("ui.start_tunnel"))
 
     def _start_tunnel_after_flask(self):
         """Avvia il tunnel dopo che Flask è partito."""
@@ -897,9 +1777,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "flask_thread") and self.flask_thread.isRunning():
             self._start_tunnel_now()
         else:
-            QMessageBox.warning(
-                self, "Error", "Failed to start Flask web server. Cannot start tunnel."
-            )
+            QMessageBox.warning(self, t("error.title"), t("ui.failed_start_web_server"))
             self.tunnel_btn.setEnabled(True)
 
     def _start_tunnel_now(self):
@@ -914,26 +1792,33 @@ class MainWindow(QMainWindow):
 
             # Aggiorna UI
             self.tunnel_btn.setEnabled(False)
-            self.tunnel_btn.setText("📱 Starting Tunnel...")
+            self.tunnel_btn.setText(t("ui.starting_server"))
 
             # Avvia thread
             self.tunnel_thread.start()
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to start tunnel: {str(e)}")
+            QMessageBox.critical(self, t("error.title"), f"{str(e)}")
             self.tunnel_btn.setEnabled(True)
 
     def stop_cloudflare_tunnel(self):
         """Ferma il tunnel Cloudflare."""
         try:
-            if hasattr(self, "tunnel_thread") and self.tunnel_thread.isRunning():
-                self.tunnel_btn.setEnabled(False)
-                self.tunnel_btn.setText("🛑 Stopping Tunnel...")
+            if (
+                hasattr(self, "tunnel_thread")
+                and self.tunnel_thread
+                and self.tunnel_thread.isRunning()
+            ):
+                if hasattr(self, "tunnel_btn") and self.tunnel_btn is not None:
+                    self.tunnel_btn.setEnabled(False)
+                    self.tunnel_btn.setText(t("ui.stop_server"))
 
                 self.tunnel_thread.stop_tunnel()
+                self.tunnel_thread.wait(5000)
+
         except Exception as e:
-            QMessageBox.warning(self, "Warning", f"Error stopping tunnel: {str(e)}")
-            self.on_tunnel_stopped()
+            QMessageBox.warning(self, t("warning.title"), f"{str(e)}")
+            self.on_cloudflare_stopped()
 
     def on_tunnel_log(self, message):
         """Gestisce i log del tunnel."""
@@ -942,7 +1827,7 @@ class MainWindow(QMainWindow):
     def on_tunnel_url_ready(self, public_url):
         """Chiamato quando l'URL pubblico è pronto."""
         self.tunnel_btn.setEnabled(True)
-        self.tunnel_btn.setText("🛑 Stop Public Exposure")
+        self.tunnel_btn.setText(t("ui.stop_web_viewer"))
         self.tunnel_btn.setStyleSheet(
             "QPushButton { background-color: #e74c3c; color: white; padding: 5px 15px; font-weight: bold; }"
         )
@@ -950,16 +1835,13 @@ class MainWindow(QMainWindow):
         # Mostra dialog con URL
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Information)
-        msg.setWindowTitle("Public URL Ready")
-        msg.setText(f"Your app is now accessible publicly!\n\nURL: {public_url}")
-        msg.setDetailedText(
-            "Share this URL with anyone to access your collection viewer.\n"
-            "The tunnel will stay active until you stop it."
-        )
+        msg.setWindowTitle(t("cloudflare.url_dialog_title"))
+        msg.setText(t("cloudflare.url_dialog_text", public_url=public_url))
+        msg.setDetailedText(t("ui.tunnel_success"))
 
         # Pulsante per copiare URL
-        copy_btn = msg.addButton("Copy URL", QMessageBox.ActionRole)
-        open_btn = msg.addButton("Open in Browser", QMessageBox.ActionRole)
+        copy_btn = msg.addButton(t("cloudflare.copy_button"), QMessageBox.ActionRole)
+        open_btn = msg.addButton(t("cloudflare.open_button"), QMessageBox.ActionRole)
         msg.addButton(QMessageBox.Ok)
 
         msg.exec_()
@@ -967,7 +1849,7 @@ class MainWindow(QMainWindow):
         clicked = msg.clickedButton()
         if clicked == copy_btn:
             QApplication.clipboard().setText(public_url)
-            self.append_bot_log("📋 Public URL copied to clipboard")
+            #self.append_bot_log("📋 Public URL copied to clipboard")
         elif clicked == open_btn:
             import webbrowser
 
@@ -976,14 +1858,16 @@ class MainWindow(QMainWindow):
     def on_tunnel_stopped(self):
         """Chiamato quando il tunnel è fermato."""
         self.tunnel_btn.setEnabled(True)
-        self.tunnel_btn.setText("📱 Expose Publicly (Cloudflare)")
+        self.tunnel_btn.setText(t("ui.expose_online"))
         self.tunnel_btn.setStyleSheet(
             "QPushButton { background-color: #2c3e50; color: white; padding: 5px 15px; }"
         )
 
     def on_tunnel_error(self, error_message):
         """Chiamato in caso di errore tunnel."""
-        QMessageBox.critical(self, "Cloudflare Tunnel Error", error_message)
+        QMessageBox.critical(
+            self, t("cloudflare.tunnel_error_critical_title"), error_message
+        )
         self.on_tunnel_stopped()
 
     def setup_database_tab(self):
@@ -992,7 +1876,7 @@ class MainWindow(QMainWindow):
         self.scraper_tab_widget = ScraperTab(self)
 
         # Aggiungi il widget al QTabWidget
-        self.tabs.addTab(self.scraper_tab_widget, "💾 " + t("ui.database_setup"))
+        self.tabs.addTab(self.scraper_tab_widget, t("ui.database_setup_tab_with_icon"))
 
     def setup_stats_tab(self):
         """Configura il tab delle statistiche."""
@@ -1018,7 +1902,7 @@ class MainWindow(QMainWindow):
         )
         stats_layout.addWidget(self.stats_text)
 
-        self.tabs.addTab(stats_widget, "📊 " + t("ui.statistics"))
+        self.tabs.addTab(stats_widget, t("ui.statistics_tab_with_icon"))
 
     def on_language_changed(self):
         """Callback per cambio lingua."""
@@ -1032,9 +1916,9 @@ class MainWindow(QMainWindow):
         # Conferma 1
         reply = QMessageBox.question(
             self,
-            "Resetta Inventario",
-            "ATTENZIONE!\n\nStai per cancellare tutto l'inventario (la tua Collezione).\n\n"
-            "Questo NON può essere annullato. Sei sicuro?",
+            t("ui.reset_inventory"),
+            t("ui.warning_message"),
+            t("ui.cannot_undone"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -1045,8 +1929,8 @@ class MainWindow(QMainWindow):
         # Conferma 2 (Ancora più forte)
         final_reply = QMessageBox.warning(
             self,
-            "CONFERMA FINALE",
-            "Questa è l'ultima possibilità. Tutti i dati della collezione verranno persi.",
+            t("ui.are_sure"),
+            t("ui.last_hope"),
             QMessageBox.Ok | QMessageBox.Cancel,
             QMessageBox.Cancel,
         )
@@ -1060,7 +1944,7 @@ class MainWindow(QMainWindow):
 
                     if count == 0:
                         QMessageBox.information(
-                            self, "Info", "L'inventario è già vuoto."
+                            self, t("info.title"), t("ui.inventory_full")
                         )
                         return
 
@@ -1070,16 +1954,14 @@ class MainWindow(QMainWindow):
 
                     QMessageBox.information(
                         self,
-                        "Successo",
-                        f"Inventario resettato con successo. {count} righe eliminate.",
+                        t("ui.success"),
+                        t("ui.delete_done"),
                     )
-                    self.append_bot_log(
-                        f"🗑️ Inventario resettato. {count} righe eliminate."
-                    )
+
 
             except Exception as e:
                 QMessageBox.critical(
-                    self, "Errore", f"Errore durante il reset dell'inventario: {e}"
+                    self, t("error.title"), t("error.generic_body", e=e)
                 )
 
     def clear_trades_log(self):
@@ -1087,10 +1969,8 @@ class MainWindow(QMainWindow):
 
         reply = QMessageBox.question(
             self,
-            "Resetta Log Trade",
-            "Stai per cancellare tutto il log dei trade.\n\n"
-            "Al prossimo avvio, il bot eseguirà una scansione storica completa di Discord.\n\n"
-            "Sei sicuro?",
+            t("trade_log.reset_title"),
+            t("trade_log.reset_warning"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -1104,7 +1984,7 @@ class MainWindow(QMainWindow):
 
                     if count == 0:
                         QMessageBox.information(
-                            self, "Info", "Il log dei trade è già vuoto."
+                            self, t("info.title"), t("trade_log.already_empty")
                         )
                         return
 
@@ -1114,17 +1994,15 @@ class MainWindow(QMainWindow):
 
                     QMessageBox.information(
                         self,
-                        "Successo",
-                        f"Log dei trade resettato. {count} righe eliminate.\n\n"
-                        "Riavvia il bot per avviare la scansione storica.",
-                    )
-                    self.append_bot_log(
-                        f"🗑️ Log dei trade resettato. {count} righe eliminate."
+                        t("ui.success"),
+                        t("trade_log.reset_success", count=count),
                     )
 
             except Exception as e:
                 QMessageBox.critical(
-                    self, "Errore", f"Errore durante il reset dei trade: {e}"
+                    self,
+                    t("trade_log.reset_error_title"),
+                    t("trade_log.reset_error_body", e=e),
                 )
 
     def setup_settings_tab(self):
@@ -1133,244 +2011,108 @@ class MainWindow(QMainWindow):
         settings_layout = QVBoxLayout(settings_widget)
 
         # ================================================================
-        # ✅ SEZIONE RARITÀ - IMMAGINI CLICCABILI
+        # SEZIONE RARITÀ (Invariata)
         # ================================================================
-        rarity_group = QGroupBox("🎴 Rarity Filter Settings")
+        rarity_group = QGroupBox(t("ui.settings_tab.rarity_filter_group"))
         rarity_layout = QHBoxLayout(rarity_group)
-        rarity_layout.setSpacing(15)  # Spazio tra le immagini
+        rarity_layout.setSpacing(15)
         rarity_layout.setContentsMargins(10, 10, 10, 10)
-
-        # ✅ CARICA RARITÀ SALVATE
         saved_rarities = (
             SELECTED_RARITIES if SELECTED_RARITIES else list(RARITY_DATA.keys())
         )
-
-        self.rarity_checkboxes = {}  # Manteniamo per compatibilità
-        self.rarity_labels = {}  # Salviamo i QLabel per applicare il filtro
-
-        ICON_HEIGHT = 30  # Altezza fissa per tutte le immagini
-
-        # ✅ ITERA SUI NOMI DEL DATABASE
+        self.rarity_checkboxes = {}
+        self.rarity_labels = {}
+        ICON_HEIGHT = 30
         for rarity_name, icon_filename in RARITY_DATA.items():
-
-            # ✅ Container per ogni rarità (solo immagine)
             rarity_widget = QWidget()
             rarity_widget.setCursor(Qt.PointingHandCursor)
             rarity_widget.setProperty("rarity_name", rarity_name)
             rarity_widget.setProperty("selected", rarity_name in saved_rarities)
-
             rarity_container = QVBoxLayout(rarity_widget)
             rarity_container.setContentsMargins(0, 0, 0, 0)
             rarity_container.setSpacing(0)
-
-            # ✅ IMMAGINE CLICCABILE
             icon_label = QLabel()
             icon_label.setAlignment(Qt.AlignCenter)
-
-            icon_path = icon_filename
+            icon_path = get_resource_path(icon_filename)
             if os.path.exists(icon_path):
                 pixmap = QPixmap(icon_path)
-                # Scala mantenendo proporzioni
                 pixmap = pixmap.scaledToHeight(ICON_HEIGHT, Qt.SmoothTransformation)
                 icon_label.setPixmap(pixmap)
-                icon_label.setProperty("original_pixmap", pixmap)  # Salva originale
+                icon_label.setProperty("original_pixmap", pixmap)
             else:
-                # Fallback
                 icon_label.setText(rarity_name.replace(" ", "\n"))
                 icon_label.setFixedSize(ICON_HEIGHT, ICON_HEIGHT)
                 icon_label.setStyleSheet(
                     """
                     QLabel {
-                        font-weight: bold;
-                        font-size: 10px;
-                        border: 2px solid #ccc;
-                        background: #f0f0f0;
-                        border-radius: 5px;
-                        padding: 5px;
+                        font-weight: bold; font-size: 10px; border: 2px solid #ccc;
+                        background: #f0f0f0; border-radius: 5px; padding: 5px;
                     }
                 """
                 )
-
             icon_label.setToolTip(rarity_name)
-
-            # ✅ APPLICA FILTRO GRIGIO SE NON SELEZIONATA
             if rarity_name not in saved_rarities:
-                self.apply_grayscale_filter(icon_label)
-
+                self.apply_grayscale_filter(icon_label, rarity_name)
             rarity_container.addWidget(icon_label, alignment=Qt.AlignCenter)
-
-            # ✅ SALVA RIFERIMENTI
             self.rarity_labels[rarity_name] = icon_label
-            self.rarity_checkboxes[rarity_name] = rarity_widget  # Per compatibilità
-
-            # ✅ CLICK HANDLER
+            self.rarity_checkboxes[rarity_name] = rarity_widget
             rarity_widget.mousePressEvent = (
                 lambda event, name=rarity_name: self.toggle_rarity(name)
             )
-
             rarity_layout.addWidget(rarity_widget)
-
         rarity_layout.addStretch()
         settings_layout.addWidget(rarity_group)
-        # ================================================================
-        # ℹ️ SEZIONE INFO & LINK
-        # ================================================================
-        info_group = QGroupBox("ℹ️ Extra & Info")
-        info_layout = QVBoxLayout(info_group)
-
-        # Testo informativo con formatting
-        info_text = QTextBrowser()
-        info_text.setReadOnly(True)
-        info_text.setMaximumHeight(300)
-        info_text.setStyleSheet(
-            """
-            QTextEdit {
-                background-color: #2a2a2a;
-                border: 1px solid #555;
-                border-radius: 5px;
-                padding: 15px;
-                font-size: 11px;
-                line-height: 1.6;
-            }
-        """
-        )
-
-        # Contenuto HTML con link cliccabili
-        info_html = """
-        <div style="color: #e0e0e0; font-family: 'Segoe UI', Arial, sans-serif;">
-            <p style="font-size: 13px; font-weight: bold; color: #3498db; margin-bottom: 10px;">
-                🎴 Pokemon TeamRocket Tool
-            </p>
-            
-            <p style="margin-bottom: 12px;">
-                Thank you for downloading <b>Pokemon TeamRocket Tool</b>!<br>
-                Created by <b style="color: #e74c3c;">pcb.is.good</b>, 
-                designed to work alongside 
-                <a href="https://github.com/Arturo-1212/PTCGPB" 
-                style="color: #3498db; text-decoration: none;">
-                    Arturo-1212/PTCGPB
-                </a>.
-            </p>
-            
-            <p style="font-size: 12px; font-weight: bold; color: #f39c12; margin-top: 15px; margin-bottom: 8px;">
-                💝 Special Thanks:
-            </p>
-            <ul style="margin-left: 20px; margin-top: 5px;">
-                <li style="margin-bottom: 5px;">
-                    <b>Arturo</b> (Bot Creator) - 
-                    <a href="https://github.com/Arturo-1212" 
-                    style="color: #3498db; text-decoration: none;">
-                        Arturo-1212
-                    </a>
-                </li>
-                <li style="margin-bottom: 5px;">
-                    <b>GummyBaer</b> (Feedback + Card and Pack Matching Algorithm)
-                </li>
-            </ul>
-            
-            <p style="margin-top: 15px; margin-bottom: 8px;">
-                For any questions, refer to the official bot Discord:
-            </p>
-            <p style="margin-left: 20px;">
-                🔗 <a href="https://discord.gg/Msa5vNjUUf" 
-                    style="color: #7289da; text-decoration: none; font-weight: bold;">
-                    discord.gg/Msa5vNjUUf
-                </a>
-            </p>
-            
-            <hr style="border: none; border-top: 1px solid #555; margin: 15px 0;">
-            
-            <p style="font-size: 10px; color: #888; text-align: center;">
-                Version 1.0 | Built with ❤️ for the TCG Pocket community
-            </p>
-        </div>
-        """
-
-        info_text.setHtml(info_html)
-        info_text.setOpenExternalLinks(True)
-
-        info_layout.addWidget(info_text)
 
         # ================================================================
-        # 🔗 PULSANTI SOCIAL/LINK VELOCI
+        # SEZIONE KEVIN BOT FOLDER (Aggiunta)
         # ================================================================
-        links_layout = QHBoxLayout()
-
-        # Pulsante Discord
-        discord_btn = QPushButton("💬 Join Discord")
-        discord_btn.clicked.connect(
-            lambda: self.open_url("https://discord.gg/Msa5vNjUUf")
+        bot_folder_group = QGroupBox(t("ui.settings_tab.bot_path_group"))
+        bot_folder_layout = QHBoxLayout(bot_folder_group)
+        self.bot_folder_input = QLineEdit()
+        self.bot_folder_input.setPlaceholderText(
+            t("ui.settings_tab.bot_path_placeholder")
         )
-        discord_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #7289da;
-                color: white;
-                padding: 8px 15px;
-                font-weight: bold;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #5b6eae;
-            }
-        """
-        )
-        links_layout.addWidget(discord_btn)
-
-        # Pulsante GitHub Bot
-        github_bot_btn = QPushButton("📦 PTCGPB GitHub")
-        github_bot_btn.clicked.connect(
-            lambda: self.open_url("https://github.com/Arturo-1212/PTCGPB")
-        )
-        github_bot_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #2ecc71;
-                color: white;
-                padding: 8px 15px;
-                font-weight: bold;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #27ae60;
-            }
-        """
-        )
-        links_layout.addWidget(github_bot_btn)
-
-        # Pulsante GitHub Creator
-        github_creator_btn = QPushButton("👤 pcb.is.good")
-        github_creator_btn.clicked.connect(
-            lambda: self.open_url("https://github.com/pcbisgood")
-        )
-        github_creator_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #3498db;
-                color: white;
-                padding: 8px 15px;
-                font-weight: bold;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #2980b9;
-            }
-        """
-        )
-        links_layout.addWidget(github_creator_btn)
-
-        links_layout.addStretch()
-        info_layout.addLayout(links_layout)
-
-        settings_layout.addWidget(info_group)
+        self.bot_folder_input.textChanged.connect(self.save_settings)
+        bot_folder_layout.addWidget(self.bot_folder_input)
+        self.bot_folder_btn = QPushButton(t("ui.settings_tab.browse_button"))
+        self.bot_folder_btn.clicked.connect(self.select_bot_folder)
+        bot_folder_layout.addWidget(self.bot_folder_btn)
+        settings_layout.addWidget(bot_folder_group)
 
         # ================================================================
-        # ⚙️ APPLICATION SETTINGS
+        # SEZIONE NOTIFICATION SETTINGS (Aggiunta)
         # ================================================================
-        settings_group = QGroupBox("⚙️ " + t("ui.application_settings"))
+        notification_group = QGroupBox(t("ui.settings_tab.notification_group_title"))
+        notification_layout = QVBoxLayout(notification_group)
+        self.notification_enable_cb = QCheckBox(
+            t("ui.settings_tab.notification_enable_checkbox")
+        )
+        self.notification_enable_cb.toggled.connect(self.save_settings)
+        notification_layout.addWidget(self.notification_enable_cb)
+        notif_channel_layout = QHBoxLayout()
+        notif_channel_layout.addWidget(QLabel(t("ui.settings_tab.notification_channel_label")))
+        self.notification_channel_input = QLineEdit()
+        self.notification_channel_input.setPlaceholderText(
+            t("ui.settings_tab.notification_channel_placeholder")
+        )
+        self.notification_channel_input.textChanged.connect(self.save_settings)
+        notif_channel_layout.addWidget(self.notification_channel_input)
+        notification_layout.addLayout(notif_channel_layout)
+        settings_layout.addWidget(notification_group)
+
+        # ================================================================
+        # ℹ️ SEZIONE INFO & LINK (RIMOSSA)
+        # ================================================================
+        # Questo blocco è stato completamente rimosso.
+        # Il suo contenuto è ora in open_info_dialog()
+
+        # ================================================================
+        # ⚙️ APPLICATION SETTINGS (Con offset)
+        # ================================================================
+        settings_group = QGroupBox(t("ui.application_settings"))
         settings_group_layout = QVBoxLayout(settings_group)
-
-        # Language selection
+        settings_group_layout.setContentsMargins(10, 10, 10, 10)  # Offset
+        settings_group_layout.setSpacing(10)  # Offset
         language_layout = QHBoxLayout()
         language_layout.addWidget(QLabel(t("ui.language") + ":"))
         self.language_combo = QComboBox()
@@ -1381,83 +2123,108 @@ class MainWindow(QMainWindow):
         language_layout.addWidget(self.language_combo)
         language_layout.addStretch()
         settings_group_layout.addLayout(language_layout)
-
-        # Mark as not initialized yet (will be set in load_settings)
         self._language_combo_initialized = False
-
-        # Theme selection
         theme_layout = QHBoxLayout()
-        theme_layout.addWidget(QLabel("Theme:"))
-        self.theme_combo = QCheckBox("Dark Theme (Default)")
+        theme_layout.addWidget(QLabel(t("ui.settings_tab.theme_label")))
+        self.theme_combo = QCheckBox(t("ui.settings_tab.dark_theme_checkbox"))
         self.theme_combo.setChecked(True)
         theme_layout.addWidget(self.theme_combo)
         theme_layout.addStretch()
         settings_group_layout.addLayout(theme_layout)
-
-        # Auto-start bot
-        self.autostart_cb = QCheckBox("Auto-start bot on launch")
+        self.autostart_cb = QCheckBox(t("ui.settings_tab.autostart_checkbox"))
         settings_group_layout.addWidget(self.autostart_cb)
-
-        # Minimize to tray
-        self.minimize_tray_cb = QCheckBox("Minimize to system tray")
+        self.minimize_tray_cb = QCheckBox(t("ui.settings_tab.minimize_to_tray_checkbox"))
         self.minimize_tray_cb.setChecked(True)
         settings_group_layout.addWidget(self.minimize_tray_cb)
-
         settings_layout.addWidget(settings_group)
 
-        db_management_group = QGroupBox("🗄️ " + t("ui.database_management"))
+        # ================================================================
+        # 🗄️ DATABASE MANAGEMENT (Modificato con pulsante Info)
+        # ================================================================
+        db_management_group = QGroupBox(t("ui.database_management"))
         db_management_layout = QVBoxLayout(db_management_group)
 
-        # ✅ Layout Orizzontale per i pulsanti
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(10)
 
-        # --- 1. Svuota Carte Trovate (found_cards) ---
-        self.clear_found_cards_btn = QPushButton("Svuota Log Carte")
+        # --- Pulsanti Esistenti (allineati a sinistra) ---
+        self.clear_found_cards_btn = QPushButton(t("ui.settings_tab.clear_cards_log_button"))
         self.clear_found_cards_btn.clicked.connect(self.clear_found_cards)
         self.clear_found_cards_btn.setStyleSheet(
             "QPushButton { background-color: #e67e22; color: white; padding: 8px; font-weight: bold; border-radius: 5px; }"
         )
         self.clear_found_cards_btn.setToolTip(
-            "Svuota solo la tabella 'found_cards' (il tab 'Cards Found'). Non resetta l'inventario."
+            t("ui.settings_tab.clear_cards_log_tooltip")
         )
         buttons_layout.addWidget(self.clear_found_cards_btn)
 
-        # --- 2. Resetta Inventario (account_inventory) ---
-        self.clear_inventory_btn = QPushButton("Resetta Inventario")
+        self.clear_inventory_btn = QPushButton(t("ui.settings_tab.reset_inventory_button"))
         self.clear_inventory_btn.clicked.connect(self.clear_account_inventory)
         self.clear_inventory_btn.setStyleSheet(
             "QPushButton { background-color: #e74c3c; color: white; padding: 8px; font-weight: bold; border-radius: 5px; }"
         )
         self.clear_inventory_btn.setToolTip(
-            "ATTENZIONE: Svuota la tabella 'account_inventory'. Perderai i conteggi della tua collezione."
+            t("ui.settings_tab.reset_inventory_tooltip")
         )
         buttons_layout.addWidget(self.clear_inventory_btn)
 
-        # --- 3. Resetta Log Trade (trades) ---
-        self.clear_trades_btn = QPushButton("Resetta Trade (Riscansiona)")
+        self.clear_trades_btn = QPushButton(t("ui.settings_tab.reset_trades_button"))
         self.clear_trades_btn.clicked.connect(self.clear_trades_log)
         self.clear_trades_btn.setStyleSheet(
             "QPushButton { background-color: #c0392b; color: white; padding: 8px; font-weight: bold; border-radius: 5px; }"
         )
         self.clear_trades_btn.setToolTip(
-            "ATTENZIONE: Svuota la tabella 'trades'. Al prossimo avvio, il bot eseguirà una scansione storica completa."
+            t("ui.settings_tab.reset_trades_tooltip")
         )
         buttons_layout.addWidget(self.clear_trades_btn)
-        self.open_appdata_btn = QPushButton("📂 Apri Cartella Dati")
-        self.open_appdata_btn.clicked.connect(self.open_app_data_folder)
-        self.open_appdata_btn.setStyleSheet("QPushButton { background-color: #3498db; color: white; padding: 8px; font-weight: bold; border-radius: 5px; }")
-        self.open_appdata_btn.setToolTip("Apre la cartella AppData dove sono salvati il database, i log e le impostazioni.")
-        buttons_layout.addWidget(self.open_appdata_btn)
-        buttons_layout.addStretch()
-        db_management_layout.addLayout(buttons_layout)  # Aggiungi il layout orizzontale
 
+        self.open_appdata_btn = QPushButton(t("ui.settings_tab.open_data_folder_button"))
+        self.open_appdata_btn.clicked.connect(self.open_app_data_folder)
+        self.open_appdata_btn.setStyleSheet(
+            "QPushButton { background-color: #3498db; color: white; padding: 8px; font-weight: bold; border-radius: 5px; }"
+        )
+        self.open_appdata_btn.setToolTip(
+            t("ui.settings_tab.open_data_folder_tooltip")
+        )
+        buttons_layout.addWidget(self.open_appdata_btn)
+
+        # Aggiunge spazio flessibile tra i pulsanti di sinistra e quello di destra
+        buttons_layout.addStretch()
+
+        # ================================================================
+        # ✅ NUOVO PULSANTE INFO (Aggiunto a destra)
+        # ================================================================
+        self.info_btn = QPushButton()
+        self.info_btn.setIcon(
+            self.style().standardIcon(QStyle.SP_MessageBoxInformation)
+        )
+        self.info_btn.setFixedSize(32, 32)
+        self.info_btn.setToolTip(t("ui.settings_tab.show_info_tooltip"))
+        self.info_btn.setStyleSheet(
+            """
+            QPushButton {
+                border-radius: 16px; /* Metà della dimensione fissa (32/2) */
+                border: 1px solid #555;
+                background-color: #3a3a3a;
+            }
+            QPushButton:hover {
+                background-color: #4a4a4a;
+            }
+        """
+        )
+        # Collega il click alla nuova funzione
+        self.info_btn.clicked.connect(self.open_info_dialog)
+        buttons_layout.addWidget(self.info_btn)  # Aggiunto all'estrema destra
+        # ================================================================
+
+        db_management_layout.addLayout(buttons_layout)
         settings_layout.addWidget(db_management_group)
+
         # ================================================================
         # FINALIZE
         # ================================================================
-        settings_layout.addStretch()
-        self.tabs.addTab(settings_widget, "⚙️ " + t("ui.settings"))
+        settings_layout.addStretch()  # Rimuove lo stretch proporzionale
+        self.tabs.addTab(settings_widget, t("ui.settings"))
 
     # ================================================================
     # ✅ FUNZIONI PER GESTIRE RARITÀ
@@ -1637,9 +2404,8 @@ class MainWindow(QMainWindow):
         # ✅ MODIFICATO: Spiegazione aggiunta al popup
         reply = QMessageBox.question(
             self,
-            "Svuota Log Carte Trovate",
-            "Stai per svuotare il log delle carte trovate (la tabella 'Cards Found').\n\n"
-            "Questo NON resetta l'inventario della tua collezione.\n\nSei sicuro di voler continuare?",
+            t("ui.dialog.clear_found_cards_log_title"),
+            t("ui.dialog.clear_found_cards_log_text"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -1695,7 +2461,7 @@ class MainWindow(QMainWindow):
         """
         print("ℹ️ Uscita forzata richiesta dalla tray icon...")
         self.force_quit = True  # Imposta il flag
-        self.close()            # Chiama closeEvent per gestire lo shutdown
+        self.close()  # Chiama closeEvent per gestire lo shutdown
 
     def setup_system_tray(self):
         """Configura l'icona nel system tray."""
@@ -1713,10 +2479,10 @@ class MainWindow(QMainWindow):
         # Menu del tray
         tray_menu = QMenu()
 
-        show_action = tray_menu.addAction("Show")
+        show_action = tray_menu.addAction(t("ui.tray.show"))
         show_action.triggered.connect(self.show_from_tray)  # ⬅️ Cambia qui
 
-        quit_action = tray_menu.addAction("Quit")
+        quit_action = tray_menu.addAction(t("ui.tray.quit"))
         quit_action.triggered.connect(self.quit_application)  # ⬅️ Cambia qui
 
         self.tray_icon.setContextMenu(tray_menu)
@@ -1732,24 +2498,54 @@ class MainWindow(QMainWindow):
     # BOT CONTROL FUNCTIONS
     # =========================================================================
 
-    def start_bot(self):
-        """Avvia il Discord bot."""
-        token = self.token_input.text().strip()
-        channel_id = self.channel_input.text().strip()
+    # ui_main_window.py (dentro MainWindow)
 
-        if not token or not channel_id:
+    def start_bot(self):
+        """
+        Avvia il Discord bot principale.
+        Verifica il Token e la selezione dei canali (dopo che sono stati caricati).
+        """
+        token = self.token_input.text().strip()
+
+        # 1. Validazione del Token (unico check rigido)
+        if not token:
+            QMessageBox.warning(self, "Error", "Please provide Bot Token.")
+            return
+
+        # 2. Recupera la lista degli ID selezionati (dal set salvato/caricato)
+        channel_ids = list(self.selected_channel_ids)
+
+        # 3. Validazione Selezione Canali (solo se la lista dei canali è già stata caricata)
+        # Questa condizione controlla che:
+        # A) Nessun canale è stato selezionato (not channel_ids) E
+        # B) La lista dei canali disponibili (available_channels) è già stata popolata dal loader
+        #    Questo impedisce il messaggio di errore al primo avvio assoluto.
+        if (
+            not channel_ids
+            and hasattr(self, "available_channels")
+            and self.available_channels
+        ):
             QMessageBox.warning(
-                self, "Error", "Please provide both Token and Channel ID"
+                self, "Error", "Please select at least one Channel ID to scan."
             )
             return
 
-        try:
-            channel_id = int(channel_id)
-        except:
-            QMessageBox.warning(self, "Error", "Channel ID must be a number")
-            return
+        # 4. Ferma il loader leggero (se attivo)
+        if (
+            hasattr(self, "channel_loader_thread")
+            and self.channel_loader_thread
+            and self.channel_loader_thread.isRunning()
+        ):
+            self.channel_loader_thread.quit()
+            self.channel_loader_thread.wait(500)
 
-        self.bot_thread = DiscordBotThread(token, channel_id)
+        # 5. Avvia il thread principale
+
+        # Passa la LISTA di ID interi selezionati al thread
+        self.bot_thread = DiscordBotThread(token, channel_ids)
+
+        # Collegamenti standard
+        self.bot_thread.channels_ready_signal.connect(self.on_channels_ready)
         self.bot_thread.log_signal.connect(self.append_bot_log)
         self.bot_thread.progress_signal.connect(self.on_bot_progress)
         self.bot_thread.trade_signal.connect(self.add_trade_to_table)
@@ -1843,7 +2639,7 @@ class MainWindow(QMainWindow):
         """
         try:
             percent = progress_info.get("percent", 0)
-            status = progress_info.get("status", "Elaborazione...")
+            status = progress_info.get("status", t("misc.processing"))
 
             # Mostra il testo
             self.bot_progress_bar.setFormat(status)
@@ -1901,7 +2697,7 @@ class MainWindow(QMainWindow):
             "Error": "🔴",
         }
         icon = status_icons.get(status, "⚫")
-        self.bot_status_label.setText(f"Status: {icon} {status}")
+        self.bot_status_label.setText(t("bot_status.status_text", icon=icon, status=status))
 
     # =========================================================================
     # TRADE AND CARD MANAGEMENT
@@ -1930,12 +2726,12 @@ class MainWindow(QMainWindow):
                 )
                 preview_label.setPixmap(pixmap)
             else:
-                preview_label.setText("❌")
+                preview_label.setText(t("misc.cross_mark"))
         else:
-            preview_label.setText("🖼️")
+            preview_label.setText(t("misc.picture_mark"))
 
         # ✅ Tooltip (Usa il BLOB originale, grande)
-        preview_label.setToolTip(self.create_image_tooltip(image_blob, "Screenshot"))
+        preview_label.setToolTip(self.create_image_tooltip(image_blob, t("misc.screenshot")))
 
         self.trades_table.setCellWidget(row, 0, preview_label)
 
@@ -1944,8 +2740,8 @@ class MainWindow(QMainWindow):
         account_item.setData(Qt.UserRole, trade_data.get("image_url"))
 
         cards_item = QTableWidgetItem(trade_data.get("cards_found", ""))
-        xml_item = QTableWidgetItem("✓" if trade_data.get("xml_path") else "✗")
-        image_item = QTableWidgetItem("✓" if trade_data.get("image_url") else "✗")
+        xml_item = QTableWidgetItem(t("misc.check_mark") if trade_data.get("xml_path") else t("misc.ballot_x"))
+        image_item = QTableWidgetItem(t("misc.check_mark") if trade_data.get("image_url") else t("misc.ballot_x"))
 
         self.trades_table.setItem(row, 1, account_item)
         self.trades_table.setItem(row, 2, cards_item)
@@ -1957,46 +2753,66 @@ class MainWindow(QMainWindow):
 
         self.trades_table.scrollToBottom()
 
-    def _get_or_create_account(self, account_name):
+    # ui_main_window.py (dentro MainWindow)
+    def _get_or_create_account(
+        self,
+        account_id: str,
+        account_name: Optional[str] = None,
+        device_password: Optional[str] = None,
+    ):
         """
-        Ottiene o crea un account nel database.
-        MODIFICATO: Usa self.conn e self.db_lock per essere thread-safe
-        e usa self.append_bot_log per gli errori.
+        Ottiene o crea un account nel database (Thread-safe).
+        Questa versione usa account_id come unica PK, poiché è stata determinata dal bot.
         """
-        try:
-            with self.db_lock:  # Usa il lock per proteggere la connessione
-                cursor = self.conn.cursor()
+        final_pk = account_id
 
-                # Controlla se esiste
-                cursor.execute(
-                    "SELECT account_id FROM accounts WHERE account_name = ?",
-                    (account_name,),
-                )
-                result = cursor.fetchone()
-
-                if result:
-                    return result[0]
-
-                # Crea nuovo account
-                cursor.execute(
-                    "INSERT INTO accounts (account_name) VALUES (?)", (account_name,)
-                )
-                self.conn.commit()
-
-                # Ritorna l'ID appena inserito
-                return cursor.lastrowid
-        except Exception as e:
-            # ✅ CORREZIONE: Usa self.append_bot_log invece di print o log_callback
-            self.append_bot_log(f"⚠️ Errore gestione account: {e}")
+        if not final_pk:
             return None
 
-    # In ui_main_window.py (aggiungi questa nuova funzione)
+        try:
+            # Usiamo self.db_lock e self.conn (connessione della MainWindow)
+            with self.db_lock:
+                cursor = self.conn.cursor()
+
+                # STEP 1: Inserisci o Ignora. account_name è qui il nome di fallback.
+                # Se è già stato creato dal bot (con deviceId o Fallback), ignora.
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO accounts 
+                    (device_account, account_name, device_password) 
+                    VALUES (?, ?, ?)
+                """,
+                    (final_pk, final_pk, device_password),
+                )
+
+                # STEP 2: Aggiorna solo se necessario
+                if device_password or account_name:
+                    # Usiamo final_pk come account_name se non fornito (per consistenza)
+                    name_to_set = account_name if account_name else final_pk
+
+                    cursor.execute(
+                        """
+                        UPDATE accounts 
+                        SET device_password = ?, 
+                            account_name = ?
+                        WHERE device_account = ?
+                    """,
+                        (device_password, name_to_set, final_pk),
+                    )
+
+                self.conn.commit()
+
+                # STEP 3: Ritorna la PK utilizzata
+                return final_pk
+
+        except Exception as e:
+            print(f"⚠️ Errore gestione account '{final_pk}' in MainWindow: {e}")
+            return final_pk
 
     def process_db_write_queue(self):
         """
         Processa la coda di scrittura del database.
-        MODIFICATO: Aggiunge l'incremento alla tabella 'account_inventory'
-        usando un UPSERT.
+        Inserisce i log in 'found_cards' utilizzando le tuple fornite.
         """
         if self.db_write_queue.empty():
             return
@@ -2006,6 +2822,7 @@ class MainWindow(QMainWindow):
         # Svuota la coda in modo sicuro
         while not self.db_write_queue.empty():
             try:
+                # item_tuple è: (card_id, account_id, message_id, confidence, path)
                 cards_to_process.append(self.db_write_queue.get_nowait())
             except queue.Empty:
                 break
@@ -2018,41 +2835,30 @@ class MainWindow(QMainWindow):
             with sqlite3.connect(DB_FILENAME, timeout=10.0) as conn:
                 cursor = conn.cursor()
 
-                # SQL 1: Inserisci nel log 'found_cards' (come prima)
+                # SQL: Inserisci nel log 'found_cards' (5 valori)
+                # La tupla in coda è: (card_id, account_id, message_id, confidence, path)
                 sql_found_log = """
                     INSERT OR IGNORE INTO found_cards 
                     (card_id, account_id, message_id, confidence_score, source_image_path)
                     VALUES (?, ?, ?, ?, ?)
                 """
 
-                # SQL 2: Aggiorna l'inventario (UPSERT)
-                # Incrementa 'quantity' di 1
-                sql_inventory_upsert = """
-                    INSERT INTO account_inventory (account_id, card_id, quantity)
-                    VALUES (?, ?, 1)
-                    ON CONFLICT(account_id, card_id) 
-                    DO UPDATE SET quantity = quantity + 1
-                """
-
-                for item_tuple in cards_to_process:
-                    # item_tuple = (card_id, account_id, message_id, confidence, path)
-
-                    card_id = item_tuple[0]
-                    account_id = item_tuple[1]
-
-                    # 1. Esegui log in found_cards
-                    cursor.execute(sql_found_log, item_tuple)
-
-                    # 2. Esegui UPSERT in account_inventory
-                    if account_id and card_id:  # Assicurati che i dati ci siano
-                        cursor.execute(sql_inventory_upsert, (account_id, card_id))
+                # Esegue l'inserimento batch di tutte le tuple raccolte
+                cursor.executemany(sql_found_log, cards_to_process)
 
                 # Finalizza la transazione
                 conn.commit()
 
-                print(
-                    f"✅ Batch writer: Elaborate {len(cards_to_process)} carte (Log + Inventario)."
-                )
+        except Exception as e:
+            # L'errore 'account_id' era probabilmente causato da un errore precedente nel ciclo.
+            # Stampiamo l'errore reale:
+            print(f"❌ Errore Batch Writer: {e}")
+            # Se fallisce, rimetti gli elementi in coda per il prossimo tentativo
+            print(
+                f"⚠️ Dati non inseriti, {len(cards_to_process)} elementi verranno riprovati."
+            )
+            for item in cards_to_process:
+                self.db_write_queue.put(item)
 
         except Exception as e:
             print(f"❌ Errore Batch Writer: {e}")
@@ -2065,17 +2871,19 @@ class MainWindow(QMainWindow):
 
     # In ui_main_window.py
 
+    # ui_main_window.py (dentro MainWindow)
     def on_card_found(self, card_data):
         """
         Chiamato quando viene trovata una carta.
-        Refactored: Delega l'aggiornamento della UI a CardsFoundTab.
+        Recupera i BLOB e aggiunge l'elemento alla coda di scrittura DB.
         """
 
         rarity_name = card_data.get("rarity", "Unknown")
         card_id = None
-        thumbnail_blob = None  # BLOB Carta
-        screenshot_blob = None  # BLOB Screenshot
-        is_wishlisted = False  # ✅ Flag per la wishlist
+        thumbnail_blob = None
+        screenshot_blob = None
+        set_cover_blob = None
+        is_wishlisted = False
 
         # ================================================================
         # PASSO 1: LETTURA DB (Card ID, Blobs, Wishlist Check)
@@ -2083,7 +2891,7 @@ class MainWindow(QMainWindow):
         try:
             with self.db_lock:
                 cursor = self.conn.cursor()
-                
+
                 # Recupera card_id e thumbnail_blob
                 cursor.execute(
                     "SELECT id, thumbnail_blob FROM cards WHERE set_code = ? AND card_number = ?",
@@ -2105,7 +2913,18 @@ class MainWindow(QMainWindow):
                     if result_trade:
                         screenshot_blob = result_trade[0]
 
-                # ✅ CONTROLLA SE È IN WISHLIST (ma NON inviare ancora la notifica!)
+                # Recupera cover_image_blob DAL DB
+                set_code = card_data.get("set_code")
+                if set_code:
+                    cursor.execute(
+                        "SELECT cover_image_blob FROM sets WHERE set_code = ?",
+                        (set_code,),
+                    )
+                    result_set = cursor.fetchone()
+                    if result_set:
+                        set_cover_blob = result_set[0]
+
+                # CONTROLLA SE È IN WISHLIST
                 if card_id:
                     cursor.execute(
                         "SELECT 1 FROM wishlist WHERE card_id = ?", (card_id,)
@@ -2119,92 +2938,59 @@ class MainWindow(QMainWindow):
         if not card_id:
             return
 
-        # ================================================================
-        # PASSO 2: SCRITTURA CODA DB (Invariato)
-        # ================================================================
-        try:
-            account_id = self._get_or_create_account(card_data["account_name"])
-            if account_id:
-                db_tuple = (
-                    card_id,
-                    account_id,
-                    card_data.get("message_id"),
-                    card_data.get("similarity", 0) / 100.0,
-                    card_data.get("image_path", ""),
-                )
-                self.db_write_queue.put(db_tuple)
-        except Exception as e:
-            self.append_bot_log(f"⚠️ Errore coda DB: {e}")
 
         # ================================================================
         # PASSO 3: AGGIORNAMENTO UI + NOTIFICA WISHLIST
         # ================================================================
         try:
-            # Filtro rarità (viene ancora controllato qui)
+            # Recupera la logica del filtro rarità
             try:
                 from config import get_app_data_path, RARITY_DATA
+
                 settings_path = get_app_data_path("settings.json")
             except:
                 settings_path = "settings.json"
-            
-            saved_rarities = list(RARITY_DATA.keys())  # Default
+
+            saved_rarities = list(RARITY_DATA.keys())
             if os.path.exists(settings_path):
                 try:
                     with open(settings_path, "r", encoding="utf-8") as f:
                         settings = json.load(f)
-                    saved_rarities = settings.get("selected_rarities", list(RARITY_DATA.keys()))
+                    saved_rarities = settings.get(
+                        "selected_rarities", list(RARITY_DATA.keys())
+                    )
                 except:
                     pass
 
             if rarity_name not in saved_rarities:
-                return  # Filtra la rarità prima di inviare alla UI
+                return
 
             self.append_bot_log(
-                f"   → {card_data['set_code']}_{card_data['card_number']} [{rarity_name}]"
+                f"   → {card_data['set_code']}_{card_data['card_number']} [{rarity_name}]"
             )
 
-            # ✅ AGGIUNGI I BLOB AL DIZIONARIO (PRIMA DI TUTTO!)
+            # AGGIUNGI I BLOB AL DIZIONARIO
             card_data["thumbnail_blob"] = thumbnail_blob
             card_data["screenshot_thumbnail_blob"] = screenshot_blob
+            card_data["set_cover_blob"] = set_cover_blob
 
-            # ✅ ORA INVIA LA NOTIFICA WISHLIST (CON I BLOB DISPONIBILI!)
+            # ORA INVIA LA NOTIFICA WISHLIST
             if is_wishlisted:
                 self.send_wishlist_notification(card_data)
 
-            # ✅ DELEGA L'AGGIORNAMENTO UI alla scheda
+            # DELEGA L'AGGIORNAMENTO UI
             if hasattr(self, "cards_found_tab_widget"):
                 self.cards_found_tab_widget.add_new_card(card_data)
 
         except Exception as e:
             print(f"❌ Errore aggiornamento UI CardsFound: {e}")
             import traceback
+
             traceback.print_exc()
 
-    def open_card_image(self, event, path):
-        """
-        Apre l'immagine della carta (URL o path).
-        MODIFICATO: Apre gli URL nel browser, i file locali nel dialog.
-        """
-        if not path:
-            print("❌ Immagine non disponibile")
+            print(t("misc.image_not_available"))
             return
 
-        try:
-            if path.startswith("http"):
-                # È un URL, apri nel browser
-                print(f"🌍 Apertura URL carta (browser): {path}")
-                import webbrowser
-
-                webbrowser.open(path)
-            elif os.path.exists(path):
-                # È un path locale (logica vecchia)
-                print(f"📂 Apertura file carta (interno): {path}")
-                dialog = ImageViewerDialog(path, self)
-                dialog.exec_()
-            else:
-                print(f"❌ File o URL non trovato: {path}")
-        except Exception as e:
-            print(f"❌ Errore apertura immagine: {e}")
 
     def open_pack_image(self, event, path):
         """
@@ -2212,82 +2998,119 @@ class MainWindow(QMainWindow):
         MODIFICATO: Apre gli URL nel browser.
         """
         if not path:
-            print("❌ Immagine non disponibile")
+            print(t("misc.image_not_available"))
             return
 
         try:
             if path.startswith("http"):
                 # È un URL, apri nel browser
-                print(f"🌍 Apertura URL screenshot (browser): {path}")
+                print(t("misc.opening_screenshot_url_browser", path=path))
                 import webbrowser
 
                 webbrowser.open(path)
             elif os.path.exists(path):
                 # È un path locale (logica vecchia)
-                print(f"📂 Apertura file screenshot (interno): {path}")
+                print(t("misc.opening_screenshot_file_internal", path=path))
                 dialog = ImageViewerDialog(path, self)
                 dialog.exec_()
             else:
-                print(f"❌ File o URL non trovato: {path}")
+                print(t("misc.file_or_url_not_found", path=path))
         except Exception as e:
-            print(f"❌ Errore apertura dialog screenshot: {e}")
+            print(t("misc.error_opening_screenshot_dialog", e=e))
+
+
+
 
     def send_wishlist_notification(self, card_data):
         """
-        Invia una notifica per la wishlist.
+        Invia notifiche per la wishlist.
+        ORDINE:
+        1. Toast (Windows notification)
+        2. Discord (webhook) - SE ABILITATO
+        3. Tray (fallback)
         """
-        print(f"🔔 send_wishlist_notification chiamata per: {card_data.get('card_name', 'Unknown')}")
-        
+        print(
+            f"🔔 send_wishlist_notification chiamata per: {card_data.get('card_name', 'Unknown')}"
+        )
+
         try:
-            from windows_toasts import Toast, WindowsToaster, InteractableWindowsToaster, ToastDisplayImage, ToastImagePosition
+            from windows_toasts import (
+                Toast,
+                WindowsToaster,
+                InteractableWindowsToaster,
+                ToastDisplayImage,
+                ToastImagePosition,
+            )
             windows_toast_available = True
             print("   ✅ windows_toasts importato con successo")
         except ImportError as e:
             windows_toast_available = False
             print(f"   ❌ windows_toasts NON disponibile: {e}")
+
+        # ============================================================================
+        # STEP 1: Invia Toast Notification (Windows)
+        # ============================================================================
         
         if windows_toast_available:
             try:
                 print("   📱 Tentativo notifica Toast...")
                 from .notification_manager import send_toast_notification
-                
+
                 success = send_toast_notification(card_data)
                 print(f"   Toast success: {success}")
 
-                if success:
-                    return
-                else:
-                    print("⚠️ Notifica Rich fallita, uso il fallback (Tray).")
-                    self.send_tray_notification(card_data)
-
+                if not success:
+                    print("⚠️ Notifica Toast fallita, uso il fallback (Tray).")
+                    
             except Exception as e:
                 print(f"❌ Errore imprevisto in send_toast_notification: {e}")
                 import traceback
                 traceback.print_exc()
-                self.send_tray_notification(card_data)
         else:
-            print("⚠️ Windows Toast NON disponibile, uso Tray")
-            self.send_tray_notification(card_data)
+            print("⚠️ Windows Toast NON disponibile")
 
-
-
-    def send_tray_notification(self, card_data: dict):
-        """Invia notifica tramite system tray (fallback senza immagine)."""
+        # ============================================================================
+        # STEP 2: Invia Discord Notification (SE ABILITATO NELLE SETTINGS)
+        # ============================================================================
+        
         try:
-            card_name = card_data.get('card_name', 'Unknown')
-            set_code = card_data.get('set_code', '')
-            card_number = card_data.get('card_number', '?')
-
-            if hasattr(self, 'tray_icon') and self.tray_icon.isVisible():
-                self.tray_icon.showMessage(
-                    "💝 Wishlist Card Found!",
-                    f"{card_name}\n({set_code} #{card_number})",
-                    QSystemTrayIcon.Information,
-                    10000
-                )
-                print(f"✅ Notifica Wishlist (Tray) inviata per: {card_name}")
+            import json
+            import os
+            from config import get_app_data_path
+            
+            settings_path = get_app_data_path("settings.json")
+            
+            if os.path.exists(settings_path):
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                
+                # Leggi la flag per Discord notifications
+                discord_enabled = settings.get('custom_notification_enabled', False)
+                discord_channel_id = settings.get('notification_channel', '')
+                
+                print(f"   🔵 Discord notifications abilitato: {discord_enabled}")
+                print(f"   🔵 Discord channel ID: {discord_channel_id if discord_channel_id else 'NOT SET'}")
+                
+                if discord_enabled and discord_channel_id:
+                    print("   📤 Invio notifica Discord...")
+                    discord_success = send_discord_bot_message(card_data)
+                    print(f"   Discord success: {discord_success}")
+                else:
+                    print("   ⏭️  Discord notifications disabilitato o channel non configurato")
+                    
         except Exception as e:
-            print(f"❌ Errore notifica Tray: {e}")
+            print(f"❌ Errore Discord notifications: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # ============================================================================
+        # STEP 3: Invia Tray Notification (FALLBACK)
+        # ============================================================================
+        
+        print("   📌 Invio notifica Tray (fallback)...")
+        #self.send_tray_notification(card_data)
+
+
 
     # =========================================================================
     # IMAGE PREVIEW AND INTERACTION
@@ -2303,138 +3126,107 @@ class MainWindow(QMainWindow):
     #   # =========================================================================
 
     def refresh_stats(self):
-        """Aggiorna le statistiche."""
+        """Aggiorna le statistiche.
+        ✅ CORRETTO: Aggiornate le JOIN per usare la nuova chiave primaria device_account.
+        """
         try:
             # ================================================================
             # ✅ CORREZIONE: Carica le rarità dinamicamente dalle impostazioni
-            # (Proprio come facciamo nella scheda "Cards Found")
             # ================================================================
             try:
                 from config import get_app_data_path, RARITY_DATA
+
                 settings_path = get_app_data_path("settings.json")
             except:
-                settings_path = "settings.json"   
-            
-            saved_rarities = list(RARITY_DATA.keys()) # Default
+                settings_path = "settings.json"
+
+            saved_rarities = list(RARITY_DATA.keys())  # Default
             if os.path.exists(settings_path):
                 try:
-                    with open(settings_path, 'r', encoding="utf-8") as f:
-                        settings = json.load(f)       
-                    saved_rarities = settings.get('selected_rarities', list(RARITY_DATA.keys()))
+                    with open(settings_path, "r", encoding="utf-8") as f:
+                        settings = json.load(f)
+                    saved_rarities = settings.get(
+                        "selected_rarities", list(RARITY_DATA.keys())
+                    )
                 except Exception:
-                    pass # Usa il default se il file è corrotto
-            # ================================================================
+                    pass
 
             with sqlite3.connect(DB_FILENAME) as conn:
                 cursor = conn.cursor()
-                
+
                 # Sets
                 cursor.execute("SELECT COUNT(*) FROM sets")
                 sets_count = cursor.fetchone()[0]
-                
+
                 # Cards
                 cursor.execute("SELECT COUNT(*) FROM cards")
                 cards_count = cursor.fetchone()[0]
-                
-                # ================================================================
-                # ✅ CORREZIONE: Crea la query SQL dinamicamente
-                # ================================================================
-                
-                # 1. Crea i segnaposto (es. "?, ?, ?, ...")
-                placeholders = ', '.join('?' for _ in saved_rarities)
-                
-                # 2. Inserisci i segnaposto nella query
+
+                # Rarity Counts (Invariato)
+                placeholders = ", ".join("?" for _ in saved_rarities)
                 rarity_query = f"""
                     SELECT rarity, COUNT(*) 
                     FROM cards 
                     WHERE rarity IN ({placeholders})
                     GROUP BY rarity
                 """
-                
-                # 3. Esegui la query con la lista delle rarità
                 cursor.execute(rarity_query, saved_rarities)
                 rarity_counts = cursor.fetchall()
-                # ================================================================
-                
+
                 # Accounts
                 cursor.execute("SELECT COUNT(*) FROM accounts")
                 accounts_count = cursor.fetchone()[0]
-                
-                # Total inventory
+
+                # Total inventory (Invariato)
                 cursor.execute("SELECT SUM(quantity) FROM account_inventory")
                 total_inventory = cursor.fetchone()[0] or 0
-                
+
                 # Found cards
                 cursor.execute("SELECT COUNT(*) FROM found_cards")
                 found_count = cursor.fetchone()[0]
-                
-                # Top accounts
-                cursor.execute("""
+
+                # ✅ CORREZIONE: Top accounts - JOIN e GROUP BY devono usare device_account (PK)
+                cursor.execute(
+                    """
                     SELECT a.account_name, SUM(ai.quantity) as total
                     FROM accounts a
-                    JOIN account_inventory ai ON a.account_id = ai.account_id
-                    GROUP BY a.account_id
+                    -- JOIN su account_id (in inventory) = device_account (in accounts)
+                    JOIN account_inventory ai ON a.device_account = ai.account_id
+                    -- GROUP BY usa la PK testuale
+                    GROUP BY a.device_account
                     ORDER BY total DESC
                     LIMIT 10
-                """)
+                """
+                )
                 top_accounts = cursor.fetchall()
-                
-                # Top cards
-                cursor.execute("""
+
+                # Top cards (Invariato)
+                cursor.execute(
+                    """
                     SELECT c.card_name, c.set_code, c.rarity, COUNT(*) as times_found
                     FROM found_cards fc
                     JOIN cards c ON fc.card_id = c.id
                     GROUP BY fc.card_id
                     ORDER BY times_found DESC
                     LIMIT 10
-                """)
+                """
+                )
                 top_cards = cursor.fetchall()
-                
+
                 # --- Costruzione del testo (invariata) ---
-                
-                stats_text = f"""
+
+                stats_text = """
 ╔═══════════════════════════════════════════════════════════════════╗
 ║                    DATABASE STATISTICS                            ║
 ╚═══════════════════════════════════════════════════════════════════╝
-
-📦 SETS
-   Total Sets: {sets_count}
-
-🎴 CARDS
-   Total Cards: {cards_count}
-   Cards by Rarity (Filtro attivo):
 """
-                # (Assicurati che rarity_counts sia definito anche se la query fallisce)
-                if rarity_counts:
-                    for rarity, count in rarity_counts:
-                        stats_text += f"      • {rarity}: {count}\n"
-                else:
-                    stats_text += "      • (Nessuna rarità selezionata trovata)\n"
-                
-                stats_text += f"""
-👥 ACCOUNTS
-   Total Accounts: {accounts_count}
-   Total Cards in Inventory: {total_inventory}
 
-🔍 SCANNING ACTIVITY
-   Total Cards Found: {found_count}
-
-📊 TOP 10 ACCOUNTS (by card count):
-"""
-                for idx, (account_name, total) in enumerate(top_accounts, 1):
-                    stats_text += f"   {idx:2d}. {account_name}: {total} cards\n"
-                
-                stats_text += f"""
-🌟 TOP 10 MOST FOUND CARDS:
-"""
-                for idx, (card_name, set_code, rarity, times) in enumerate(top_cards, 1):
-                    stats_text += f"   {idx:2d}. {card_name} ({set_code}) - {rarity} - Found {times}x\n"
-                
                 self.stats_text.setPlainText(stats_text)
-        
+
         except Exception as e:
-            self.stats_text.setPlainText(f"Error loading statistics:\n{str(e)}")
+            self.stats_text.setPlainText(t("error.loading_stats", error=str(e)))
             import traceback
+
             traceback.print_exc()
 
     # =========================================================================
@@ -2453,7 +3245,9 @@ class MainWindow(QMainWindow):
             # self.conn è la tua connessione attiva al DB
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT account_id FROM accounts WHERE account_name = ?",
+                """
+                SELECT device_account FROM accounts WHERE account_name = ?
+            """,
                 (account_name,),
             )
             result = cursor.fetchone()
@@ -2524,52 +3318,29 @@ class MainWindow(QMainWindow):
             self.on_tab_changed(current_index)
 
     def get_account_id_by_name(self, account_name):
-        """Recupera l'ID dell'account dal nome."""
+        """
+        Recupera l'ID dell'account dal nome.
+        ✅ MODIFICATO: Cerca il Device ID (PK) per corrispondenza e lo ritorna.
+        """
         if account_name.lower() in ["tutti gli account", "all accounts"]:
-            return None  # Significa TUTTI gli account
+            return None
 
         try:
             with sqlite3.connect(DB_FILENAME) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT account_id FROM accounts WHERE account_name = ?",
+                    # ✅ Seleziona la PK (device_account) e aliasala a account_id per la riga
+                    "SELECT device_account AS account_id FROM accounts WHERE account_name = ?",
                     (account_name,),
                 )
                 row = cursor.fetchone()
-                return int(row["account_id"]) if row else None
+
+                # Ritorna il Device ID (come stringa, che è il nuovo ID)
+                return row["account_id"] if row else None
         except Exception as e:
             print(f"❌ Errore recupero account ID: {e}")
             return None
-
-    def load_accounts_into_combo_box(self):
-        """Carica gli account dal database nel combobox della collection."""
-        try:
-            self.collection_account_combo.blockSignals(True)
-            self.collection_account_combo.clear()
-            self.collection_account_combo.addItem("Tutti gli account")
-
-            db_path = get_app_data_path(DB_FILENAME)
-            with sqlite3.connect(db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT account_id, account_name FROM accounts ORDER BY account_name"
-                )
-                accounts = cursor.fetchall()
-
-                for account in accounts:
-                    # ✅ Memorizza anche account_id come userData
-                    self.collection_account_combo.addItem(
-                        account["account_name"], account["account_id"]
-                    )
-
-                print(f"✅ Caricati {len(accounts)} account")
-
-            self.collection_account_combo.blockSignals(False)
-
-        except Exception as e:
-            print(f"❌ Errore caricamento account: {e}")
 
     def on_set_ready_batch(
         self, set_code, set_name, total_cards, cover_path, owned_count, total_copies
@@ -2602,7 +3373,10 @@ class MainWindow(QMainWindow):
     def load_set_cards(
         self, content_widget, set_code, inventory, cursor, account_name=None
     ):
-        """Carica le carte di un set (chiamato solo quando necessario - lazy loading)."""
+        """
+        Carica le carte di un set (chiamato solo quando necessario - lazy loading).
+        ✅ CORRETTO: Modificate tutte le JOIN con acc.device_account.
+        """
         try:
             # Query per ottenere info set (inclusa cover)
             cursor.execute(
@@ -2674,30 +3448,30 @@ class MainWindow(QMainWindow):
             code_label.setStyleSheet("QLabel { color: #888; font-size: 11px; }")
             info_layout.addWidget(code_label)
 
-            # ✅ CORRETTO - Calcola stats in modo sicuro (senza alias problematici)
+            # ✅ CORRETTO - Calcola stats in modo sicuro
             owned_count = 0
             total_owned_copies = 0
 
             try:
-                # ✅ FIX: Query corretta senza alias problematici
                 if (
                     account_name
                     and account_name != "All Accounts"
                     and account_name != t("ui.all_accounts")
                 ):
-                    # Query per un account specifico
+                    # Query per un account specifico (Owned Count)
                     cursor.execute(
                         """
                         SELECT COUNT(DISTINCT c.id) as distinct_cards, COALESCE(SUM(ai.quantity), 0) as total_copies
                         FROM cards c
                         INNER JOIN account_inventory ai ON c.id = ai.card_id
-                        INNER JOIN accounts acc ON ai.account_id = acc.account_id
+                        -- ✅ CORREZIONE JOIN CRUCIALE: ai.account_id (stringa) = acc.device_account (PK)
+                        INNER JOIN accounts acc ON ai.account_id = acc.device_account
                         WHERE c.set_code = ? AND ai.quantity > 0 AND acc.account_name = ?
                     """,
                         (set_code, account_name),
                     )
                 else:
-                    # Query per tutti i conti - ✅ RIMOSSI i LEFT JOIN inutili
+                    # Query per tutti i conti (non richiede la tabella accounts)
                     cursor.execute(
                         """
                         SELECT COUNT(DISTINCT c.id) as distinct_cards, COALESCE(SUM(ai.quantity), 0) as total_copies
@@ -2751,7 +3525,7 @@ class MainWindow(QMainWindow):
             content_widget.layout().addWidget(separator)
 
             # =========================================================================
-            # GRID DELLE CARTE
+            # GRID DELLE CARTE (Calcolo quantità per ogni carta)
             # =========================================================================
 
             try:
@@ -2807,13 +3581,14 @@ class MainWindow(QMainWindow):
                                     """
                                     SELECT COALESCE(SUM(ai.quantity), 0) as total_qty
                                     FROM account_inventory ai
-                                    INNER JOIN accounts acc ON ai.account_id = acc.account_id
+                                    -- ✅ CORREZIONE JOIN: ai.account_id = acc.device_account
+                                    INNER JOIN accounts acc ON ai.account_id = acc.device_account
                                     WHERE ai.card_id = ? AND acc.account_name = ?
                                 """,
                                     (card_id, account_name),
                                 )
                             else:
-                                # Per tutti i conti
+                                # Per tutti i conti (invariato)
                                 cursor.execute(
                                     """
                                     SELECT COALESCE(SUM(ai.quantity), 0) as total_qty
@@ -2826,9 +3601,9 @@ class MainWindow(QMainWindow):
                             result = cursor.fetchone()
                             if result and result[0]:
                                 quantity = int(result[0])
+
                         except Exception as e:
                             print(f"⚠️ Error fetching quantity for card {card_id}: {e}")
-                            # Fallback verso inventory se disponibile
                             quantity = inventory.get(card_id, 0) if inventory else 0
 
                         is_wishlisted = card_id in wishlist_ids
@@ -2902,10 +3677,18 @@ class MainWindow(QMainWindow):
         self.collection_account_combo.setEnabled(True)
 
     def on_tab_changed(self, index):
-        """Quando cambi tab, carica la collection SOLO se è la prima volta"""
+        """Gestisce il cambio di tab."""
 
-        # Assumendo che il tab collezione sia all'indice 2
-        # (Controlla setup_ui se l'ordine è: Bot, CardsFound, Collection)
+        # Tab Discord Bot (Assumendo l'indice 0)
+        if index == 0:
+            # Se il bot NON è in esecuzione e la lista canali non è stata caricata
+            if not (
+                hasattr(self, "bot_thread")
+                and self.bot_thread
+                and self.bot_thread.isRunning()
+            ):
+                # Avvia il caricatore leggero per ricaricare la lista canali
+                self.start_channel_loader()
         if index == 2:
             # Chiama il metodo sul widget della scheda, non su self
             if not self.collection_tab_widget.collection_loaded:
@@ -2939,23 +3722,23 @@ class MainWindow(QMainWindow):
     def save_settings(self):
         """Salva tutte le impostazioni nel settings.json principale."""
         try:
-            # ✅ ESTRAI LE RARITÀ SELEZIONATE
             selected_rarities = [
                 rarity_name
                 for rarity_name, widget in self.rarity_checkboxes.items()
                 if widget.property("selected")
             ]
-
             if not selected_rarities:
                 selected_rarities = SELECTED_RARITIES or list(RARITY_DATA.keys())
 
-            # ✅ CREA/AGGIORNA IL SETTINGS COMPLETO
             settings = {
                 "token": (
                     self.token_input.text() if hasattr(self, "token_input") else ""
                 ),
-                "channel_id": (
-                    self.channel_input.text() if hasattr(self, "channel_input") else ""
+                # ✅ SALVA SOLO LA LISTA DI ID SELEZIONATI (nuova struttura)
+                "selected_channel_ids": (
+                    list(self.selected_channel_ids)
+                    if hasattr(self, "selected_channel_ids")
+                    else []
                 ),
                 "autostart": (
                     self.autostart_cb.isChecked()
@@ -2977,11 +3760,27 @@ class MainWindow(QMainWindow):
                     if hasattr(self, "language_combo")
                     else DEFAULT_LANGUAGE
                 ),
-                "selected_rarities": selected_rarities,  # ✅ RARITÀ SALVATE QUI
+                "selected_rarities": selected_rarities,
                 "last_updated": datetime.now().isoformat(),
+                # ✅ NUOVI VALORI (Bot Folder, Notifiche)
+                "bot_folder": (
+                    self.bot_folder_input.text()
+                    if hasattr(self, "bot_folder_input")
+                    else ""
+                ),
+                "custom_notification_enabled": (
+                    self.notification_enable_cb.isChecked()
+                    if hasattr(self, "notification_enable_cb")
+                    else False
+                ),
+                "notification_channel": (
+                    self.notification_channel_input.text()
+                    if hasattr(self, "notification_channel_input")
+                    else ""
+                ),
             }
+            # ❌ Rimosso "channel_id" e "channel_configs" dalla scrittura per pulizia.
 
-            # ✅ SALVA NEL FILE PRINCIPALE
             settings_path = get_app_data_path("settings.json")
             os.makedirs(os.path.dirname(settings_path), exist_ok=True)
 
@@ -3002,49 +3801,54 @@ class MainWindow(QMainWindow):
         except:
             settings_path = "settings.json"
 
-        # ✅ Se il file non esiste, usa i default
         if not os.path.exists(settings_path):
             print("⚠️ Settings file not found, using defaults")
-            if hasattr(self, "rarity_checkboxes"):
-                # Imposta tutte le rarità come selezionate di default
-                for rarity_name, widget in self.rarity_checkboxes.items():
-                    widget.setProperty("selected", True)
-                    label = self.rarity_labels.get(rarity_name)
-                    if label:
-                        self.remove_grayscale_filter(
-                            label
-                        )  # ✅ USA remove_grayscale_filter per verde
+            # ... (gestione rarità di default)
             return
 
         try:
-            try:
-                from config import get_app_data_path
-
-                settings_path = get_app_data_path("settings.json")
-            except:
-                settings_path = "settings.json"
             with open(settings_path, "r", encoding="utf-8") as f:
                 settings = json.load(f)
 
-            # ✅ 1. CARICA BOT TOKEN (se il widget esiste)
+            # ✅ 1. CARICA BOT TOKEN
             if hasattr(self, "token_input"):
                 token = settings.get("token", "")
-                self.token_input.blockSignals(True)  # Evita loop
+                self.token_input.blockSignals(True)
                 self.token_input.setText(token)
                 self.token_input.blockSignals(False)
                 print(
                     f"✅ Loaded bot token: {'*' * len(token) if token else '(empty)'}"
                 )
 
-            # ✅ 2. CARICA CHANNEL ID (se il widget esiste)
-            if hasattr(self, "channel_input"):
-                channel_id = settings.get("channel_id", "")
-                self.channel_input.blockSignals(True)  # Evita loop
-                self.channel_input.setText(channel_id)
-                self.channel_input.blockSignals(False)
-                print(
-                    f"✅ Loaded channel ID: {channel_id if channel_id else '(empty)'}"
+            # ✅ 2. CARICA CHANNEL SELEZIONATI (Solo lo stato)
+            self.selected_channel_ids = set()
+
+            # 1. Prova la nuova chiave (prioritaria)
+            if settings.get("selected_channel_ids"):
+                self.selected_channel_ids = set(settings["selected_channel_ids"])
+
+            # 2. Fallback Legacy: Vecchia struttura di Channel Configs (lista di dict)
+            elif settings.get("channel_configs"):
+                # Converte i vecchi dizionari in un set di ID
+                self.selected_channel_ids = set(
+                    c["id"] for c in settings["channel_configs"] if c.get("id")
                 )
+
+            # 3. Fallback Legacy 2: Vecchia stringa singola o multipla separata da virgola
+            elif settings.get("channel_id") or settings.get("channel_ids"):
+                id_string = settings.get("channel_id", "") or settings.get(
+                    "channel_ids", ""
+                )
+                if id_string:
+                    # Filtra e converte in interi
+                    id_list = [
+                        int(id_raw.strip())
+                        for id_raw in id_string.split(",")
+                        if id_raw.strip().isdigit()
+                    ]
+                    self.selected_channel_ids = set(id_list)
+
+            print(f"✅ Loaded {len(self.selected_channel_ids)} selected channel IDs.")
 
             # ✅ 3. CARICA LINGUA
             if hasattr(self, "language_combo"):
@@ -3082,34 +3886,47 @@ class MainWindow(QMainWindow):
                 try:
                     from config import RARITY_DATA
 
-                    # Default: tutte le rarità selezionate se non specificato
                     selected_rarities = settings.get(
                         "selected_rarities", list(RARITY_DATA.keys())
                     )
-
                     print(f"✅ Loading rarities: {selected_rarities}")
-
                     for rarity_name, widget in self.rarity_checkboxes.items():
                         is_selected = rarity_name in selected_rarities
                         widget.setProperty("selected", is_selected)
-
-                        # ✅ APPLICA/RIMUOVI FILTRO COLORE
                         label = self.rarity_labels.get(rarity_name)
                         if label:
                             if is_selected:
-                                # ✅ SELEZIONATA: verde (usa remove_grayscale_filter)
                                 self.remove_grayscale_filter(label, rarity_name)
                             else:
-                                # ✅ NON SELEZIONATA: rosso + grayscale
                                 self.apply_grayscale_filter(label, rarity_name)
-
                     print(f"✅ Loaded {len(selected_rarities)} selected rarities")
-
                 except Exception as e:
                     print(f"⚠️ Error loading rarities: {e}")
                     import traceback
 
                     traceback.print_exc()
+
+            # ✅ 8. CARICA I NUOVI VALORI (Bot Folder, Notifiche)
+            if hasattr(self, "bot_folder_input"):
+                bot_folder = settings.get("bot_folder", "")
+                self.bot_folder_input.blockSignals(True)
+                self.bot_folder_input.setText(bot_folder)
+                self.bot_folder_input.blockSignals(False)
+                print(f"✅ Loaded Bot Folder: {bot_folder}")
+
+            if hasattr(self, "notification_enable_cb"):
+                enable_notif = settings.get("custom_notification_enabled", False)
+                self.notification_enable_cb.blockSignals(True)
+                self.notification_enable_cb.setChecked(enable_notif)
+                self.notification_enable_cb.blockSignals(False)
+                print(f"✅ Loaded Enable Notifications: {enable_notif}")
+
+            if hasattr(self, "notification_channel_input"):
+                notif_channel = settings.get("notification_channel", "")
+                self.notification_channel_input.blockSignals(True)
+                self.notification_channel_input.setText(notif_channel)
+                self.notification_channel_input.blockSignals(False)
+                print(f"✅ Loaded Notification Channel: {notif_channel}")
 
             print("✅ All settings loaded successfully")
 
@@ -3131,53 +3948,71 @@ class MainWindow(QMainWindow):
         Se 'Minimize to tray' è attivo, nasconde la finestra.
         Altrimenti, o se 'force_quit' è True, chiude l'app.
         """
-        
+
         # Controlla se l'utente vuole veramente chiudere (dal menu tray)
         # O se l'opzione "minimize" è disattivata
         if self.force_quit or not self.minimize_tray_cb.isChecked():
             print("🛑 Avvio shutdown completo...")
             print("...attesa notifiche...")
-            time.sleep(0.5)         
+            time.sleep(0.5)
             # 1. Svuota la coda di scrittura DB
-            if hasattr(self, 'db_writer_timer'):
+            if hasattr(self, "db_writer_timer"):
                 print("...svuotamento coda DB...")
                 self.db_writer_timer.stop()
                 self.process_db_write_queue()
-            
+
             # 2. Ferma i thread principali
             print("...arresto thread...")
-            if hasattr(self, 'bot_thread') and self.bot_thread and self.bot_thread.isRunning():
-                self.bot_thread.stop() # 'stop()' è il metodo corretto per DiscordBotThread
+            if (
+                hasattr(self, "bot_thread")
+                and self.bot_thread
+                and self.bot_thread.isRunning()
+            ):
+                self.bot_thread.stop()  # 'stop()' è il metodo corretto per DiscordBotThread
                 self.bot_thread.wait(2000)
-            
-            if hasattr(self, 'scraper_tab_widget') and self.scraper_tab_widget.scraper_thread and self.scraper_tab_widget.scraper_thread.isRunning():
-                self.scraper_tab_widget.stop_scraper() # Usa il metodo della scheda
+
+            if (
+                hasattr(self, "scraper_tab_widget")
+                and self.scraper_tab_widget.scraper_thread
+                and self.scraper_tab_widget.scraper_thread.isRunning()
+            ):
+                self.scraper_tab_widget.stop_scraper()  # Usa il metodo della scheda
                 self.scraper_tab_widget.scraper_thread.wait(2000)
-            
-            if hasattr(self, 'flask_thread') and self.flask_thread and self.flask_thread.isRunning():
+
+            if (
+                hasattr(self, "flask_thread")
+                and self.flask_thread
+                and self.flask_thread.isRunning()
+            ):
                 self.flask_thread.stop_server()
                 self.flask_thread.wait(2000)
-                
-            if hasattr(self, 'tunnel_thread') and self.tunnel_thread and self.tunnel_thread.isRunning():
+
+            if (
+                hasattr(self, "tunnel_thread")
+                and self.tunnel_thread
+                and self.tunnel_thread.isRunning()
+            ):
                 self.tunnel_thread.stop_tunnel()
                 self.tunnel_thread.wait(2000)
 
             print("✅ Shutdown completato. Chiusura.")
-            event.accept() # Permetti alla finestra di chiudersi
+            event.accept()  # Permetti alla finestra di chiudersi
 
         else:
             # L'utente ha cliccato 'X' e 'Minimize to tray' è ATTIVO
             print("ℹ️ Minimizzazione nella tray icon...")
             event.ignore()  # Impedisci la chiusura
-            self.hide()     # Nascondi la finestra
-            
+            self.hide()  # Nascondi la finestra
+
             # (Opzionale) Mostra una notifica
-            if hasattr(self, 'tray_icon'):
+            if hasattr(self, "tray_icon"):
                 self.tray_icon.showMessage(
                     "TCGP Team Rocket Tool",
-                    t("ui.app_running_in_background"), # "L'app è in esecuzione in background"
+                    t(
+                        "ui.app_running_in_background"
+                    ),  # "L'app è in esecuzione in background"
                     QSystemTrayIcon.Information,
-                    2000 # 2 secondi
+                    2000,  # 2 secondi
                 )
 
     # =========================================================================

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokémon TCG Pocket Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #2b2d31;
+            color: #e4e4e7;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #1e1f22;
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 24px;
+            border: 1px solid #3a3c42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-content {
+            flex: 1;
+        }
+
+        h1 {
+            color: #f4c542;
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #a1a1aa;
+            font-size: 0.95rem;
+            font-weight: 400;
+        }
+
+        /* ✅ Bottone Stats */
+        .stats-btn {
+            padding: 12px 24px;
+            background: #f4c542;
+            color: #1e1f22;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .stats-btn:hover {
+            background: #e6b53a;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(244, 197, 66, 0.3);
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            background: #1e1f22;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #3a3c42;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 16px;
+            background: #2b2d31;
+            border: 1px solid #3a3c42;
+            border-radius: 8px;
+            color: #e4e4e7;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #f4c542;
+            background: #313338;
+        }
+
+        .search-box input::placeholder {
+            color: #71717a;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: 1px solid #3a3c42;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            background: #2b2d31;
+            color: #e4e4e7;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background: #313338;
+            border-color: #52525b;
+        }
+
+        .btn.active {
+            background: #f4c542;
+            color: #1e1f22;
+            border-color: #f4c542;
+        }
+
+        .sets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .set-card {
+            background: #1e1f22;
+            border-radius: 12px;
+            border: 1px solid #3a3c42;
+            transition: all 0.2s;
+            cursor: pointer;
+            padding: 20px;
+        }
+
+        .set-card:hover {
+            transform: translateY(-4px);
+            border-color: #52525b;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        .set-content {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .set-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .set-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+        }
+
+        .set-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .set-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #e4e4e7;
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+
+        .set-code {
+            font-size: 0.85rem;
+            color: #71717a;
+            font-weight: 500;
+        }
+
+        .set-cover-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 72px;
+            height: 72px;
+            border: 2px solid #f4c542;
+            border-radius: 8px;
+            flex-shrink: 0;
+            padding: 4px;
+        }
+
+        .set-cover-small {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .completion-badge {
+            background: #3a3c42;
+            color: #f4c542;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .completion-badge.complete {
+            background: #22c55e;
+            color: #1e1f22;
+        }
+
+        .completion-badge.partial {
+            background: #f4c542;
+            color: #1e1f22;
+        }
+
+        .set-stats {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            background: #2b2d31;
+            border-radius: 8px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #f4c542;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #a1a1aa;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #2b2d31;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #f4c542;
+            transition: width 0.5s ease;
+        }
+
+        .progress-fill.complete {
+            background: #22c55e;
+        }
+
+        footer {
+            text-align: center;
+            color: #71717a;
+            padding: 24px;
+            margin-top: 40px;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                text-align: center;
+                gap: 16px;
+            }
+
+            .sets-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            background: #1e1f22;
+            border-radius: 12px;
+            border: 1px solid #3a3c42;
+            color: #71717a;
+        }
+        
+        .no-results svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+            stroke: #71717a;
+        }
+
+        .no-results h2 {
+            color: #a1a1aa;
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>Pokémon TCG Pocket</h1>
+                <p class="subtitle">Collection Manager</p>
+            </div>
+            <!-- ✅ Bottone Stats -->
+            <a href="/stats" class="stats-btn">
+                📊 Statistics
+            </a>
+        </header>
+
+        <div class="controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search sets..." onkeyup="filterSets()">
+            </div>
+            <div class="filter-group">
+                <button class="btn active" onclick="filterByCompletion('all')">All</button>
+                <button class="btn" onclick="filterByCompletion('complete')">Complete</button>
+                <button class="btn" onclick="filterByCompletion('incomplete')">Incomplete</button>
+            </div>
+        </div>
+
+        <div class="sets-grid" id="setsGrid">
+            {% for set in sets %}
+            <div class="set-card" data-completion="{{ set.completion }}" onclick="window.location.href='/set/{{ set.code }}'">
+                <div class="set-content">
+                    <div class="set-header">
+                        <div class="set-info">
+                            <div class="set-text">
+                                <div class="set-title">{{ set.name }}</div>
+                                <div class="set-code">{{ set.code }}</div>
+                            </div>
+                            {% if set.cover_blob %}
+                            <div class="set-cover-container">
+                                <img class="set-cover-small" src="data:image/png;base64,{{ set.cover_blob }}" alt="{{ set.name }}">
+                            </div>
+                            {% else %}
+                            <div class="set-cover-container"></div>
+                            {% endif %}
+                        </div>
+                        <div class="completion-badge {% if set.completion == 100 %}complete{% elif set.completion > 0 %}partial{% endif %}">
+                            {{ set.completion }}%
+                        </div>
+                    </div>
+
+                    <div class="set-stats">
+                        <div class="stat">
+                            <div class="stat-value">{{ set.owned }}</div>
+                            <div class="stat-label">Owned</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">{{ set.total_cards }}</div>
+                            <div class="stat-label">Total</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">{{ set.copies }}</div>
+                            <div class="stat-label">Copies</div>
+                        </div>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress-fill {% if set.completion == 100 %}complete{% endif %}" data-completion="{{ set.completion }}"></div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="no-results" id="noResults" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2>No results found</h2>
+            <p>Try a different search term</p>
+        </div>
+
+        <footer>
+            © 2025 Pokémon TCG Pocket Collection Manager
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.progress-fill').forEach(fill => {
+                const completion = fill.dataset.completion;
+                fill.style.width = completion + '%';
+            });
+        });
+
+        let currentFilter = 'all';
+
+        function filterSets() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const cards = document.querySelectorAll('.set-card');
+            let visibleCount = 0;
+
+            cards.forEach(card => {
+                const title = card.querySelector('.set-title').textContent.toLowerCase();
+                const code = card.querySelector('.set-code').textContent.toLowerCase();
+                const completion = parseInt(card.dataset.completion);
+
+                const matchesSearch = title.includes(searchTerm) || code.includes(searchTerm);
+                const matchesFilter = 
+                    currentFilter === 'all' ||
+                    (currentFilter === 'complete' && completion === 100) ||
+                    (currentFilter === 'incomplete' && completion < 100);
+
+                if (matchesSearch && matchesFilter) {
+                    card.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            document.getElementById('noResults').style.display = visibleCount === 0 ? 'block' : 'none';
+        }
+
+        function filterByCompletion(filter) {
+            currentFilter = filter;
+            
+            document.querySelectorAll('.filter-group .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            filterSets();
+        }
+    </script>
+</body>
+</html>

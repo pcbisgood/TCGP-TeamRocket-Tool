@@ -1,5 +1,3 @@
-"""threads.py - Thread workers per operazioni asincrone"""
-
 # Import standard library
 from threading import Thread, Event
 import asyncio
@@ -7,8 +5,7 @@ import signal
 import sys
 import os
 import sqlite3
-from typing import Optional, Callable
-
+from typing import Optional, Callable, List # <-- AGGIUNTO List
 # Import PyQt5
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 
@@ -139,19 +136,18 @@ class DiscordBotThread(QThread):
     status_signal = pyqtSignal(str)
     card_found_signal = pyqtSignal(dict)
     recover_history_signal = pyqtSignal()
+    channels_ready_signal = pyqtSignal(dict)
 
-    def __init__(self, token, channel_id):
+    # 💥 MODIFICATO: Accetta una lista di ID interi
+    def __init__(self, token, channel_ids: List[int]): 
         super().__init__()
         self.token = token
-        self.channel_id = channel_id
+        self.channel_ids = channel_ids # <-- Salva la lista
         self.client = None
         self.loop = None
         self._stop_requested = False
-        self._shutdown_complete = False  # ✅ Flag di shutdown
+        self._shutdown_complete = False
         
-        # ❌ RIMOSSI: Non connettere il segnale qui!
-        # self.recover_history_signal.connect(self._recover_history_handler)
-
     def run(self):
         """Avvia il bot Discord."""
         try:
@@ -167,7 +163,7 @@ class DiscordBotThread(QThread):
             except:
                 pass
 
-            os.environ['CHANNEL_ID'] = str(self.channel_id)
+            # ❌ RIMOSSA: os.environ['CHANNEL_ID'] non più necessario
 
             # ✅ Crea intents
             intents = discord.Intents.default()
@@ -182,7 +178,9 @@ class DiscordBotThread(QThread):
                 progress_callback=self.progress_signal.emit,
                 trade_callback=self.trade_signal.emit,
                 status_callback=self.status_signal.emit,
-                card_found_callback=self.card_found_signal.emit
+                card_found_callback=self.card_found_signal.emit,
+                channel_ids=self.channel_ids, # <-- PASSATA LA LISTA
+                channels_ready_callback=self.channels_ready_signal.emit
             )
 
             # ✅ NUOVO EVENT LOOP (mai riusato)
@@ -276,7 +274,7 @@ class DiscordBotThread(QThread):
             self.log_signal.emit(f"⚠️ Errore chiusura client: {e}")
 
     def _recover_history_handler(self):
-        """Handler per il recupero storico."""
+        """Handler per il recupero storico (usa scan incrementale)."""
         if self.client and self.loop and self.loop.is_running():
             try:
                 # Usa call_soon_threadsafe per safety
@@ -299,7 +297,6 @@ class DiscordBotThread(QThread):
     def is_running_safe(self):
         """Verifica se il bot sta girando SAFELY."""
         return self.isRunning() and self.loop is not None and self.loop.is_running()
-
 
 # =========================================================================
 # 🧵 THREAD PER IL CARICAMENTO DELLA COLLEZIONE (Invariato)
@@ -413,3 +410,73 @@ class CollectionLoaderThread(QThread):
             import traceback
             # L'errore "no such column: a.id" viene catturato qui
             self.error_signal.emit(f"Error: {str(e)}\n{traceback.format_exc()}")
+
+# threads.py (Aggiungi la nuova classe prima di DiscordBotThread)
+
+class DiscordChannelLoaderClient(discord.Client):
+    """Client leggero per la sola connessione iniziale e recupero canali."""
+    def __init__(self, *, intents, callback):
+        super().__init__(intents=intents)
+        self.callback = callback
+        
+    async def on_ready(self):
+        channels_data = {}
+        for guild in self.guilds:
+            for channel in guild.text_channels:
+                # Controlla se il bot può leggere la cronologia per quel canale
+                if channel.permissions_for(guild.me).read_message_history:
+                    channels_data[channel.id] = channel.name
+        
+        # Invia i dati alla UI
+        self.callback(channels_data)
+        
+        # Chiudi immediatamente la connessione dopo aver inviato i dati
+        await self.close()
+        
+    async def on_disconnect(self):
+        # Assicura che il loop si chiuda dopo la disconnessione
+        if self.loop and self.loop.is_running():
+             self.loop.stop()
+
+
+class DiscordChannelLoaderThread(QThread):
+    """Thread leggero per connettersi e recuperare la lista dei canali."""
+
+    channels_ready_signal = pyqtSignal(dict)
+    log_signal = pyqtSignal(str)
+
+    def __init__(self, token, parent=None):
+        super().__init__(parent)
+        self.token = token
+        self.client = None
+        self.loop = None
+        self._stop_requested = False
+
+    def run(self):
+        try:
+            self.log_signal.emit("🚀 Connessione leggera in background per recuperare i canali...")
+
+            intents = discord.Intents.default()
+            intents.message_content = False
+            intents.messages = False
+            intents.guilds = True
+
+            self.client = DiscordChannelLoaderClient(
+                intents=intents,
+                callback=self.channels_ready_signal.emit
+            )
+
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+            self.loop.run_until_complete(self.client.start(self.token))
+
+        except Exception as e:
+            self.log_signal.emit(f"❌ Errore connessione background: {e}")
+        finally:
+            if self.loop and self.loop.is_running():
+                self.loop.stop()
+            if self.client and not self.client.is_closed():
+                self.loop.run_until_complete(self.client.close())
+            if self.loop:
+                 self.loop.close()
+            self.log_signal.emit("✅ Thread leggero completato.")

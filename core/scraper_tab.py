@@ -79,10 +79,10 @@ class ScraperTab(QWidget):
                 border-radius: 3px;
             }
         """)
-        progress_layout.addWidget(QLabel("Progresso totale:"))
+        progress_layout.addWidget(QLabel(t("scraper_ui.progress_total")))
         progress_layout.addWidget(self.scraper_progress_bar)
         
-        self.scraper_info_label = QLabel("Pronto")
+        self.scraper_info_label = QLabel(t("scraper_ui.ready"))
         self.scraper_info_label.setStyleSheet("QLabel { font-size: 11px; color: #FFFFFF; margin-top: 10px; }")
         progress_layout.addWidget(self.scraper_info_label)
         

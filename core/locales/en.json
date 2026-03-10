@@ -50,6 +50,11 @@
     "tooltip_export_xml": "Export XML credentials",
     "tooltip_inject_account": "Inject account (runs inject_account.py)"
   },
+  "discord_bot": {
+    "background_connection_start": "Light background connection to fetch channels...",
+    "thread_completed": "Thread completed.",
+    "background_connection_error": "Background connection error: {e}"
+  },
   "ui": {
     "window_title": "TCGP Team Rocket Tool",
     "cloudflare_ready": "Cloudflare Tunnel Ready",
@@ -213,5 +218,80 @@
     "web_server_running_message": "Flask web server is running!",
     "url_label": "URL:",
     "browser_will_open": "Your browser will open automatically."
+  },
+  "accounts": {
+    "title": "Account Management",
+    "title_searching": "Account Management (Searching...)",
+    "title_found": "Account Management (Found: {count})",
+    "total_accounts": "Total Accounts: {count}",
+    "no_accounts_title": "No Account Found",
+    "no_accounts_message": "Add an account to get started.",
+    "search_placeholder": "Search account by name or alias (min. 3 characters)...",
+    "sort_label": "Sort:",
+    "reload_tooltip": "Reload accounts",
+    "loading": "Loading...",
+    "sort_by_dust_tooltip": "Sort by Shiny Dust (click to toggle)",
+    "sort_by_hourglass_tooltip": "Sort by hourglasses (click to toggle)",
+    "alias_placeholder": "Account alias…"
+  },
+  "scraper_ui": {
+    "progress_total": "Total progress:",
+    "ready": "Ready"
+  },
+  "dialogs": {
+    "injection_running": "Running...",
+    "injection_done": "Done (Register Exchange)",
+    "close_error": "Close (Error)",
+    "injection_account_title": "Account injection: {name}",
+    "injection_start_title": "Starting ADB injection for {name}",
+    "close_button": "Close",
+    "injection_completed_message": "Injection complete. The Pokémon app is starting.",
+    "injection_finished_log": "Injection finished.",
+    "trade_not_registered_log": "Trade not registered by user.",
+    "manual_trade_title": "Manual trade",
+    "manual_trade_prompt": "How many cards were traded?",
+    "select_instance_title": "Select Instance",
+    "select_instance_label": "Select the target MuMu instance:",
+    "no_instance_active": "No active MuMu instance found:",
+    "instance_running": "Running",
+    "instance_stopped": "Stopped"
+  },
+  "cards_found": {
+    "refresh_list": "🔄 Refresh list",
+    "refresh_list_tooltip": "Clear image cache and reload the list from the database."
+  },
+  "cloudflare": {
+    "password": "Password:",
+    "save_password": "Save password",
+    "cancel": "Cancel",
+    "configure_password_title": "Configure Cloudflare password",
+    "password_placeholder": "Enter a secure password (minimum 6 characters)...",
+    "password_info": "IMPORTANT:\n\n• LOCAL access (localhost): No password required\n• PUBLIC access (Cloudflare): Password REQUIRED\n\nThe password will protect access when sharing via Cloudflare.",
+    "password_tip": "Tip: Save this password in a safe place!",
+    "password_already_set": "A password is already set (you can change it)",
+    "no_password_set": "No password set",
+    "password_empty": "Password cannot be empty!",
+    "password_min_length": "Password must be at least 6 characters!",
+    "password_saved": "Password saved successfully!",
+    "error_saving": "Error saving: {error}",
+    "qr_code_error": "Install 'qrcode[pil]' to display the QR code",
+    "password_configured_body": "Password configured! The public URL will be password protected.",
+    "password_configured_title": "Cloudflare setup",
+    "tunnel_error_title": "Tunnel error",
+    "stop_tunnel_button": "Stop tunnel",
+    "public_url_log": "URL: {url}",
+    "log_prefix": "[Cloudflare] {message}",
+    "tunnel_error_critical_title": "Cloudflare tunnel critical error",
+    "url_dialog_title": "URL",
+    "url_dialog_text": "URL:\n{public_url}",
+    "copy_button": "Copy",
+    "open_button": "Open"
+  },
+  "card_image": {
+    "corrupted_blob": "Corrupted image (BLOB)",
+    "not_found": "Image not found"
+  },
+  "channel": {
+    "checkbox_label": "#{channel_name} ({channel_id})"
   }
 }

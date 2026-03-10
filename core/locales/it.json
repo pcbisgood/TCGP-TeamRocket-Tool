@@ -49,8 +49,6 @@
   
   "app.title": "TCGP Team Rocket Tool",
   
-  // ...existing code...
-  
   "stats": {
     "title": "STATISTICHE DATABASE",
     "sets": "SET",
@@ -164,6 +162,10 @@
   "cloudflare": {
     "password_setup": "Setup Password Cloudflare",
     "configure_password": "Configura Password per Cloudflare",
+    "configure_password_title": "Configura Password per Cloudflare",
+    "password_placeholder": "Inserisci una password sicura (minimo 6 caratteri)...",
+    "password_info": "IMPORTANTE:\n\n• Accesso LOCALE (localhost): NON richiede password\n• Accesso PUBBLICO (Cloudflare): RICHIEDE password\n\nLa password proteggerà l'accesso quando condividi via Cloudflare.",
+    "password_tip": "Consiglio: Salva questa password in un posto sicuro!",
     "password_info": "Questa password proteggerà il tuo accesso durante la condivisione via Cloudflare.\nMinimo 6 caratteri.",
     "password": "Password:",
     "save_password": "💾 Salva Password",
@@ -188,6 +190,12 @@
     "open_button": "Apri"
   },
   
+  "discord_bot": {
+    "background_connection_start": "Connessione leggera in background per recuperare i canali...",
+    "thread_completed": "Thread leggero completato.",
+    "background_connection_error": "Errore connessione background: {e}"
+  },
+  
   "bot_status": {
     "starting": "Stato: 🟡 Avvio...",
     "stopped": "Stato: ⚫ Arrestato",
@@ -207,7 +215,38 @@
     "confirm_scraping": "Conferma",
     "confirm_message": "Questo scaricherà tutti i dati delle carte dal sito web. Continuare?",
     "database_check": "Controllo Database",
-    "error_checking_db": "Impossibile controllare il database: {error}"
+    "error_checking_db": "Impossibile controllare il database: {error}",
+    "progress_total": "Progresso totale:",
+    "ready": "Pronto"
+  },
+  
+  "dialogs": {
+    "injection_running": "In esecuzione...",
+    "injection_done": "Fatto (Registra Scambio)",
+    "injection_completed_message": "Iniezione completata. L'app Pokémon si sta avviando.",
+    "close_error": "Chiudi (Errore)",
+    "injection_account_title": "Iniezione Account: {name}",
+    "injection_start_title": "Avvio iniezione ADB per {name}",
+    "close_button": "Chiudi",
+    "injection_finished_log": "Iniezione terminata.",
+    "trade_not_registered_log": "Scambio non registrato dall'utente.",
+    "manual_trade_title": "Scambio Manuale",
+    "manual_trade_prompt": "Quante carte sono state scambiate?",
+    "select_instance_title": "Seleziona Istanza",
+    "select_instance_label": "Seleziona l'istanza MuMu di destinazione:",
+    "no_instance_active": "Nessuna istanza MuMu attiva trovata:",
+    "instance_running": "In Esecuzione",
+    "instance_stopped": "Spenta"
+  },
+  
+  "cards_found": {
+    "refresh_list": "🔄 Refresh Lista",
+    "refresh_list_tooltip": "Svuota la cache delle immagini e ricarica la lista dal database."
+  },
+  
+  "card_image": {
+    "corrupted_blob": "Immagine corrotta (BLOB)",
+    "not_found": "Immagine non trovata"
   },
   
   "collection_ui": {
@@ -230,8 +269,6 @@
   "stats_ui": {
     "refresh_statistics": "🔄 Aggiorna Statistiche"
   },
-  
-  // ...existing code...
 
   "error.title": "Errore",
   "error.db_connection_failed_title": "❌ Errore Database",
@@ -248,7 +285,9 @@
 
   "info.title": "Info",
 
-  "channel.checkbox_label": "#{channel_name} ({channel_id})",
+  "channel": {
+    "checkbox_label": "#{channel_name} ({channel_id})"
+  },
 
   "app.restarting": "🔄 Riavvio dell'applicazione...",
   "app.restart_failed_title": "Riavvio Fallito",
@@ -351,5 +390,21 @@
       "clear_found_cards_log_title": "Cancella Log Carte Trovate",
       "clear_found_cards_log_text": "Stai per cancellare il log delle carte trovate (scheda 'Carte Trovate').\n\nQuesto NON resetta l'inventario della collezione.\n\nSei sicuro di voler continuare?"
     }
+  },
+
+  "accounts": {
+    "title": "Gestione Account",
+    "title_searching": "Gestione Account (Ricerca...)",
+    "title_found": "Gestione Account (Trovati: {count})",
+    "total_accounts": "Totale Account: {count}",
+    "no_accounts_title": "Nessun Account Trovato",
+    "no_accounts_message": "Aggiungi un account per iniziare.",
+    "search_placeholder": "Cerca account per nome o alias (min. 3 caratteri)...",
+    "sort_label": "Ordina:",
+    "reload_tooltip": "Ricarica account",
+    "loading": "Caricamento...",
+    "sort_by_dust_tooltip": "Ordina per Shiny Dust (clicca per alternare)",
+    "sort_by_hourglass_tooltip": "Ordina per Clessidre (clicca per alternare)",
+    "alias_placeholder": "Alias account…"
   }
 }

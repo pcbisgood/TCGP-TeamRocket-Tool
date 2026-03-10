@@ -1478,12 +1478,12 @@ class CollectionCardDialog(QDialog):
                     Qt.SmoothTransformation
                 ))
             else:
-                image_label.setText("Immagine corrotta (BLOB)")
+                image_label.setText(t("card_image.corrupted_blob"))
                 image_label.setStyleSheet("font-size: 16px; color: #888;")
 
         else:
             # Fallback se il BLOB è nullo
-            image_label.setText("Immagine non trovata")
+            image_label.setText(t("card_image.not_found"))
             image_label.setStyleSheet("font-size: 16px; color: #888;")
             
         layout.addWidget(image_label)

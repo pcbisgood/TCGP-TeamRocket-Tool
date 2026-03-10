@@ -117,24 +117,19 @@ class CloudflarePasswordDialog(QDialog):
         layout = QVBoxLayout()
         
         # Title
-        title = QLabel("Configura Password per Cloudflare")
+        title = QLabel(t("cloudflare.configure_password_title"))
         title.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 10px;")
         layout.addWidget(title)
         
         # Info
-        info = QLabel(
-            "⚠️ IMPORTANTE:\n\n"
-            "• Accesso LOCALE (localhost): NON richiede password\n"
-            "• Accesso PUBBLICO (Cloudflare): RICHIEDE password\n\n"
-            "La password proteggerà l'accesso quando condividi via Cloudflare."
-        )
+        info = QLabel(t("cloudflare.password_info"))
         info.setStyleSheet("color: #aaa; margin-bottom: 15px;")
         info.setWordWrap(True)
         layout.addWidget(info)
         
         # Textarea
         self.password_input = QTextEdit()
-        self.password_input.setPlaceholderText("Enter a secure password (minimum 6 characters)...")
+        self.password_input.setPlaceholderText(t("cloudflare.password_placeholder"))
         self.password_input.setStyleSheet("""
             QTextEdit {
                 background-color: #3a3a3a;
@@ -196,7 +191,7 @@ class CloudflarePasswordDialog(QDialog):
         layout.addLayout(button_layout)
         
         # Info finale
-        info2 = QLabel("💡 Tip: Salva questa password in un posto sicuro!")
+        info2 = QLabel(t("cloudflare.password_tip"))
         info2.setStyleSheet("color: #7f8c8d; font-size: 12px; margin-top: 10px;")
         info2.setWordWrap(True)
         info2.setAlignment(Qt.AlignCenter)

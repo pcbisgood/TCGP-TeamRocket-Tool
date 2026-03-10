@@ -50,10 +50,25 @@
     "tooltip_export_xml": "Export XML credentials",
     "tooltip_inject_account": "Inject account (runs inject_account.py)"
   },
+  "bot_status": {
+    "starting": "Status: 🟡 Starting...",
+    "stopped": "Status: ⚫ Stopped",
+    "monitoring": "Monitoring",
+    "status_text": "Status: {icon} {status}"
+  },
   "discord_bot": {
     "background_connection_start": "Light background connection to fetch channels...",
     "thread_completed": "Thread completed.",
-    "background_connection_error": "Background connection error: {e}"
+    "background_connection_error": "Background connection error: {e}",
+    "bot_starting": "Starting Discord bot...",
+    "database_empty_scan": "Database empty. Starting full historical scan...",
+    "database_existing_trades": "Existing database with {count} trade(s).",
+    "start_full_historical_scan": "Starting full historical scan...",
+    "start_realtime_monitoring": "Starting real-time message monitoring...",
+    "start_historical_scan_channel": "Starting historical scan on channel « {channel} » ({current}/{total})...",
+    "historical_scan_completed_channel": "Historical scan completed on channel « {channel} ».",
+    "historical_scan_completed_all": "Historical scan completed on all channels: {count} messages processed",
+    "historical_scan_completed_status": "Historical scan completed"
   },
   "ui": {
     "window_title": "TCGP Team Rocket Tool",
@@ -79,6 +94,8 @@
     "recent_trades_group_with_icon": "📦 Recent Trades",
     "discord_bot_tab_with_icon": "🤖 Discord Bot",
     "cards_found_tab_with_icon": "🎴 Cards Found",
+    "cards_found": "Cards Found",
+    "showing": "Showing",
     "collection_tab_with_icon": "📚 Collection",
     "database_setup_tab_with_icon": "💾 Database Setup",
     "statistics_tab_with_icon": "📊 Statistics",
@@ -207,6 +224,7 @@
       "card": "Card",
       "pack": "Pack",
       "set": "Set",
+      "set_cover": "Set cover",
       "card_number": "Card #",
       "card_name": "Card Name",
       "rarity": "Rarity",
@@ -293,5 +311,9 @@
   },
   "channel": {
     "checkbox_label": "#{channel_name} ({channel_id})"
+  },
+  "credits": {
+    "dialog_title": "Credits",
+    "html_content": "<div style=\"color: #e0e0e0; font-family: 'Segoe UI', Arial, sans-serif;\">\n            <p style=\"font-size: 13px; font-weight: bold; color: #3498db; margin-bottom: 10px;\">\n                🎴 Pokemon TeamRocket Tool\n            </p>\n            \n            <p style=\"margin-bottom: 12px;\">\n                Thanks for downloading <b>Pokemon TeamRocket Tool</b>!<br>\n                Created by <b style=\"color: #e74c3c;\">pcb.is.good</b>, \n                designed to work with \n                <a href=\"https://github.com/Arturo-1212/PTCGPB\" \n                style=\"color: #3498db; text-decoration: none;\">\n                    Arturo-1212/PTCGPB\n                </a>.\n            </p>\n            \n            <p style=\"font-size: 12px; font-weight: bold; color: #f39c12; margin-top: 15px; margin-bottom: 8px;\">\n                💝 Special Thanks:\n            </p>\n            <ul style=\"margin-left: 20px; margin-top: 5px;\">\n                <li style=\"margin-bottom: 5px;\">\n                    <b>Arturo</b> (Bot Creator) - \n                    <a href=\"https://github.com/Arturo-1212\" \n                    style=\"color: #3498db; text-decoration: none;\">\n                        Arturo-1212\n                    </a>\n                </li>\n                <li style=\"margin-bottom: 5px;\">\n                    <b>GummyBaer</b> (Feedback + Card and pack matching algorithm)\n                </li>\n            </ul>\n            \n            <p style=\"margin-top: 15px; margin-bottom: 8px;\">\n                For any questions, refer to the bot's official Discord:\n            </p>\n            <p style=\"margin-left: 20px;\">\n                🔗 <a href=\"https://discord.gg/Msa5vNjUUf\" \n                    style=\"color: #7289da; text-decoration: none; font-weight: bold;\">\n                    discord.gg/Msa5vNjUUf\n                </a>\n            </p>\n            \n            <hr style=\"border: none; border-top: 1px solid #555; margin: 15px 0;\">\n            \n            <p style=\"font-size: 10px; color: #888; text-align: center;\">\n                Version 1.0 | Built with ❤️ for the TCG Pocket community\n            </p>\n        </div>"
   }
 }

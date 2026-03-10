@@ -193,7 +193,16 @@
   "discord_bot": {
     "background_connection_start": "Connessione leggera in background per recuperare i canali...",
     "thread_completed": "Thread leggero completato.",
-    "background_connection_error": "Errore connessione background: {e}"
+    "background_connection_error": "Errore connessione background: {e}",
+    "bot_starting": "Inizio bot Discord...",
+    "database_empty_scan": "Database vuoto. Inizio scansione storica completa...",
+    "database_existing_trades": "Database esistente con {count} trade.",
+    "start_full_historical_scan": "Inizio scansione storica completa...",
+    "start_realtime_monitoring": "Inizio monitoraggio messaggi in tempo reale...",
+    "start_historical_scan_channel": "Inizio scansione storica su Canale '{channel}' ({current}/{total})...",
+    "historical_scan_completed_channel": "Scansione storica completata su Canale '{channel}'.",
+    "historical_scan_completed_all": "Scansione storica completata su tutti i canali: {count} messaggi elaborati",
+    "historical_scan_completed_status": "Scansione storica completata"
   },
   
   "bot_status": {
@@ -295,8 +304,10 @@
   "download.failed_title": "Download Fallito",
   "download.cloudflared_failed": "Impossibile scaricare cloudflared: {e}\n\nScaricalo manualmente da:\nhttps://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/\n\ne posiziona 'cloudflared.exe' in:\n{app_dir}",
 
-  "credits.dialog_title": "Crediti",
-  "credits.html_content": "<div style=\"color: #e0e0e0; font-family: 'Segoe UI', Arial, sans-serif;\">\n            <p style=\"font-size: 13px; font-weight: bold; color: #3498db; margin-bottom: 10px;\">\n                🎴 Pokemon TeamRocket Tool\n            </p>\n            \n            <p style=\"margin-bottom: 12px;\">\n                Grazie per aver scaricato <b>Pokemon TeamRocket Tool</b>!<br>\n                Creato da <b style=\"color: #e74c3c;\">pcb.is.good</b>, \n                progettato per funzionare con \n                <a href=\"https://github.com/Arturo-1212/PTCGPB\" \n                style=\"color: #3498db; text-decoration: none;\">\n                    Arturo-1212/PTCGPB\n                </a>.\n            </p>\n            \n            <p style=\"font-size: 12px; font-weight: bold; color: #f39c12; margin-top: 15px; margin-bottom: 8px;\">\n                💝 Ringraziamenti Speciali:\n            </p>\n            <ul style=\"margin-left: 20px; margin-top: 5px;\">\n                <li style=\"margin-bottom: 5px;\">\n                    <b>Arturo</b> (Creatore del Bot) - \n                    <a href=\"https://github.com/Arturo-1212\" \n                    style=\"color: #3498db; text-decoration: none;\">\n                        Arturo-1212\n                    </a>\n                </li>\n                <li style=\"margin-bottom: 5px;\">\n                    <b>GummyBaer</b> (Feedback + Algoritmo di matching per carte e pacchetti)\n                </li>\n            </ul>\n            \n            <p style=\"margin-top: 15px; margin-bottom: 8px;\">\n                Per qualsiasi domanda, fai riferimento al Discord ufficiale del bot:\n            </p>\n            <p style=\"margin-left: 20px;\">\n                🔗 <a href=\"https://discord.gg/Msa5vNjUUf\" \n                    style=\"color: #7289da; text-decoration: none; font-weight: bold;\">\n                    discord.gg/Msa5vNjUUf\n                </a>\n            </p>\n            \n            <hr style=\"border: none; border-top: 1px solid #555; margin: 15px 0;\">\n            \n            <p style=\"font-size: 10px; color: #888; text-align: center;\">\n                Versione 1.0 | Creato con ❤️ per la community di TCG Pocket\n            </p>\n        </div>",
+  "credits": {
+    "dialog_title": "Crediti",
+    "html_content": "<div style=\"color: #e0e0e0; font-family: 'Segoe UI', Arial, sans-serif;\">\n            <p style=\"font-size: 13px; font-weight: bold; color: #3498db; margin-bottom: 10px;\">\n                🎴 Pokemon TeamRocket Tool\n            </p>\n            \n            <p style=\"margin-bottom: 12px;\">\n                Grazie per aver scaricato <b>Pokemon TeamRocket Tool</b>!<br>\n                Creato da <b style=\"color: #e74c3c;\">pcb.is.good</b>, \n                progettato per funzionare con \n                <a href=\"https://github.com/Arturo-1212/PTCGPB\" \n                style=\"color: #3498db; text-decoration: none;\">\n                    Arturo-1212/PTCGPB\n                </a>.\n            </p>\n            \n            <p style=\"font-size: 12px; font-weight: bold; color: #f39c12; margin-top: 15px; margin-bottom: 8px;\">\n                💝 Ringraziamenti Speciali:\n            </p>\n            <ul style=\"margin-left: 20px; margin-top: 5px;\">\n                <li style=\"margin-bottom: 5px;\">\n                    <b>Arturo</b> (Creatore del Bot) - \n                    <a href=\"https://github.com/Arturo-1212\" \n                    style=\"color: #3498db; text-decoration: none;\">\n                        Arturo-1212\n                    </a>\n                </li>\n                <li style=\"margin-bottom: 5px;\">\n                    <b>GummyBaer</b> (Feedback + Algoritmo di matching per carte e pacchetti)\n                </li>\n            </ul>\n            \n            <p style=\"margin-top: 15px; margin-bottom: 8px;\">\n                Per qualsiasi domanda, fai riferimento al Discord ufficiale del bot:\n            </p>\n            <p style=\"margin-left: 20px;\">\n                🔗 <a href=\"https://discord.gg/Msa5vNjUUf\" \n                    style=\"color: #7289da; text-decoration: none; font-weight: bold;\">\n                    discord.gg/Msa5vNjUUf\n                </a>\n            </p>\n            \n            <hr style=\"border: none; border-top: 1px solid #555; margin: 15px 0;\">\n            \n            <p style=\"font-size: 10px; color: #888; text-align: center;\">\n                Versione 1.0 | Creato con ❤️ per la community di TCG Pocket\n            </p>\n        </div>"
+  },
 
   "trade_log.reset_title": "Resetta Log Trade",
   "trade_log.reset_warning": "Stai per cancellare tutto il log dei trade.\n\nAl prossimo avvio, il bot eseguirà una scansione storica completa di Discord.\n\nSei sicuro?",
@@ -389,6 +400,24 @@
     "dialog": {
       "clear_found_cards_log_title": "Cancella Log Carte Trovate",
       "clear_found_cards_log_text": "Stai per cancellare il log delle carte trovate (scheda 'Carte Trovate').\n\nQuesto NON resetta l'inventario della collezione.\n\nSei sicuro di voler continuare?"
+    },
+    "cards_found": "Carte Trovate",
+    "showing": "Visualizzazione",
+    "table": {
+      "preview": "Anteprima",
+      "account": "Account",
+      "cards_found": "Carte Trovate",
+      "xml": "XML",
+      "image": "Immagine",
+      "card": "Carta",
+      "pack": "Pacchetto",
+      "set": "Set",
+      "set_cover": "Copertina set",
+      "card_number": "Numero Carta",
+      "card_name": "Nome Carta",
+      "rarity": "Rarità",
+      "copies": "Copie",
+      "actions": "Azioni"
     }
   },
 

@@ -83,7 +83,8 @@
   "bot_status": {
     "starting": "Statut : 🟡 Démarrage...",
     "stopped": "Statut : ⚫ Arrêté",
-    "monitoring": "Monitoring"
+    "monitoring": "Monitoring",
+    "status_text": "Statut : {icon} {status}"
   },
   
   "scraper_ui": {
@@ -137,6 +138,15 @@
     "background_connection_start": "Connexion légère en arrière-plan pour récupérer les canaux...",
     "thread_completed": "Thread terminé.",
     "background_connection_error": "Erreur de connexion en arrière-plan : {e}",
+    "bot_starting": "Démarrage du bot Discord...",
+    "database_empty_scan": "Base de données vide. Démarrage de la numérisation historique complète...",
+    "database_existing_trades": "Base de données existante avec {count} trade(s).",
+    "start_full_historical_scan": "Démarrage de la numérisation historique complète...",
+    "start_realtime_monitoring": "Démarrage de la surveillance des messages en temps réel...",
+    "start_historical_scan_channel": "Démarrage de la numérisation historique sur le canal « {channel} » ({current}/{total})...",
+    "historical_scan_completed_channel": "Numérisation historique terminée sur le canal « {channel} ».",
+    "historical_scan_completed_all": "Numérisation historique terminée sur tous les canaux : {count} messages traités",
+    "historical_scan_completed_status": "Numérisation historique terminée",
     "connected_as": "Connecté en tant que : {name}",
     "status_connected": "Connecté",
     "status_monitoring": "Monitoring",
@@ -236,6 +246,7 @@
     "language": "Langue",
     "discord_bot": "Bot Discord",
     "cards_found": "Cartes Trouvées",
+    "showing": "Affichage",
     "collection": "Collection",
     "database_setup": "Configuration de la base de données",
     "statistics": "Statistiques",
@@ -326,6 +337,7 @@
       "card": "Carte",
       "pack": "Paquet",
       "set": "Set",
+      "set_cover": "Couverture du set",
       "card_number": "Numéro Carte",
       "card_name": "Nom de la Carte",
       "rarity": "Rareté",
@@ -500,8 +512,10 @@
   "download.failed_title": "Échec du téléchargement",
   "download.cloudflared_failed": "Impossible de télécharger cloudflared : {e}\n\nVeuillez le télécharger manuellement depuis :\nhttps://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/\n\net placez 'cloudflared.exe' dans :\n{app_dir}",
 
-  "credits.dialog_title": "Crédits",
-  "credits.html_content": "<div style=\"color: #e0e0e0; font-family: 'Segoe UI', Arial, sans-serif;\">\n            <p style=\"font-size: 13px; font-weight: bold; color: #3498db; margin-bottom: 10px;\">\n                🎴 Outil Pokemon TeamRocket\n            </p>\n            \n            <p style=\"margin-bottom: 12px;\">\n                Merci d'avoir téléchargé <b>l'Outil Pokemon TeamRocket</b> !<br>\n                Créé par <b style=\"color: #e74c3c;\">pcb.is.good</b>, \n                conçu pour fonctionner avec \n                <a href=\"https://github.com/Arturo-1212/PTCGPB\" \n                style=\"color: #3498db; text-decoration: none;\">\n                    Arturo-1212/PTCGPB\n                </a>.\n            </p>\n            \n            <p style=\"font-size: 12px; font-weight: bold; color: #f39c12; margin-top: 15px; margin-bottom: 8px;\">\n                💝 Remerciements spéciaux :\n            </p>\n            <ul style=\"margin-left: 20px; margin-top: 5px;\">\n                <li style=\"margin-bottom: 5px;\">\n                    <b>Arturo</b> (Créateur du bot) - \n                    <a href=\"https://github.com/Arturo-1212\" \n                    style=\"color: #3498db; text-decoration: none;\">\n                        Arturo-1212\n                    </a>\n                </li>\n                <li style=\"margin-bottom: 5px;\">\n                    <b>GummyBaer</b> (Commentaires + Algorithme de correspondance de cartes et de paquets)\n                </li>\n            </ul>\n            \n            <p style=\"margin-top: 15px; margin-bottom: 8px;\">\n                Pour toute question, consultez le Discord officiel du bot :\n            </p>\n            <p style=\"margin-left: 20px;\">\n                🔗 <a href=\"https://discord.gg/Msa5vNjUUf\" \n                    style=\"color: #7289da; text-decoration: none; font-weight: bold;\">\n                    discord.gg/Msa5vNjUUf\n                </a>\n            </p>\n            \n            <hr style=\"border: none; border-top: 1px solid #555; margin: 15px 0;\">\n            \n            <p style=\"font-size: 10px; color: #888; text-align: center;\">\n                Version 1.0 | Construit avec ❤️ pour la communauté TCG Pocket\n            </p>\n        </div>",
+  "credits": {
+    "dialog_title": "Crédits",
+    "html_content": "<div style=\"color: #e0e0e0; font-family: 'Segoe UI', Arial, sans-serif;\">\n            <p style=\"font-size: 13px; font-weight: bold; color: #3498db; margin-bottom: 10px;\">\n                🎴 Outil Pokemon TeamRocket\n            </p>\n            \n            <p style=\"margin-bottom: 12px;\">\n                Merci d'avoir téléchargé <b>l'Outil Pokemon TeamRocket</b> !<br>\n                Créé par <b style=\"color: #e74c3c;\">pcb.is.good</b>, \n                conçu pour fonctionner avec \n                <a href=\"https://github.com/Arturo-1212/PTCGPB\" \n                style=\"color: #3498db; text-decoration: none;\">\n                    Arturo-1212/PTCGPB\n                </a>.\n            </p>\n            \n            <p style=\"font-size: 12px; font-weight: bold; color: #f39c12; margin-top: 15px; margin-bottom: 8px;\">\n                💝 Remerciements spéciaux :\n            </p>\n            <ul style=\"margin-left: 20px; margin-top: 5px;\">\n                <li style=\"margin-bottom: 5px;\">\n                    <b>Arturo</b> (Créateur du bot) - \n                    <a href=\"https://github.com/Arturo-1212\" \n                    style=\"color: #3498db; text-decoration: none;\">\n                        Arturo-1212\n                    </a>\n                </li>\n                <li style=\"margin-bottom: 5px;\">\n                    <b>GummyBaer</b> (Commentaires + Algorithme de correspondance de cartes et de paquets)\n                </li>\n            </ul>\n            \n            <p style=\"margin-top: 15px; margin-bottom: 8px;\">\n                Pour toute question, consultez le Discord officiel du bot :\n            </p>\n            <p style=\"margin-left: 20px;\">\n                🔗 <a href=\"https://discord.gg/Msa5vNjUUf\" \n                    style=\"color: #7289da; text-decoration: none; font-weight: bold;\">\n                    discord.gg/Msa5vNjUUf\n                </a>\n            </p>\n            \n            <hr style=\"border: none; border-top: 1px solid #555; margin: 15px 0;\">\n            \n            <p style=\"font-size: 10px; color: #888; text-align: center;\">\n                Version 1.0 | Construit avec ❤️ pour la communauté TCG Pocket\n            </p>\n        </div>"
+  },
 
   "config.settings_not_found": "Fichier de paramètres non trouvé. Création par défaut dans : {file}",
   "config.settings_creation_error": "ERREUR CRITIQUE : Impossible de créer le fichier settings.json : {e}",

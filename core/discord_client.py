@@ -296,14 +296,14 @@ class TradeMonitorClient(discord.Client):
                 # ================================================================
                 # CASO A: Database Vuoto -> Avvia Scansione Storica Completa
                 # ================================================================
-                self.log_callback("🚀 Database vuoto. Inizio scansione storica completa...")
+                self.log_callback("🚀 " + t("discord_bot.database_empty_scan"))
                 await self.perform_historical_scan_streaming()
                 
             else:
                 # ================================================================
                 # CASO B: Database Esistente
                 # ================================================================
-                self.log_callback(f"Database esistente con {total_trades_in_db} trade.")
+                self.log_callback(t("discord_bot.database_existing_trades", count=total_trades_in_db))
                 
                 # 1. CARICA LA UI
                 try:
@@ -315,7 +315,7 @@ class TradeMonitorClient(discord.Client):
                     self.log_callback(f"⚠️ Errore caricamento trade recenti: {e}")
 
                 try:
-                    self.log_callback("🚀 Inizio scansione storica completa...")
+                    self.log_callback("🚀 " + t("discord_bot.start_full_historical_scan"))
                     cursor.execute("""
                         SELECT * FROM trades 
                         WHERE (scan_status = 0 OR scan_status = 2) 
@@ -354,7 +354,7 @@ class TradeMonitorClient(discord.Client):
         # ================================================================
         
         self.initial_scan_done = True
-        self.log_callback("👂 Inizio monitoraggio messaggi in tempo reale...")
+        self.log_callback("👂 " + t("discord_bot.start_realtime_monitoring"))
 
 
     def _get_or_create_account(self, display_name: str, pk_id: Optional[str] = None, device_password: Optional[str] = None):
@@ -432,7 +432,7 @@ class TradeMonitorClient(discord.Client):
         
         # 💥 CICLO SU TUTTI I CANALI
         for i, channel in enumerate(channels, 1):
-            self.log_callback(f"🚀 Inizio scansione storica su Canale '{channel.name}' ({i}/{len(channels)})...")
+            self.log_callback("🚀 " + t("discord_bot.start_historical_scan_channel", channel=channel.name, current=i, total=len(channels)))
 
             # Verifica permessi per ogni canale
             if hasattr(channel, 'guild') and channel.guild:
@@ -574,10 +574,10 @@ class TradeMonitorClient(discord.Client):
                 self.log_callback(traceback.format_exc())
             
             finally:
-                self.log_callback(f"✅ Scansione storica completata su Canale '{channel.name}'.")
+                self.log_callback("✅ " + t("discord_bot.historical_scan_completed_channel", channel=channel.name))
 
-        self.log_callback(f"✅ Scansione storica completata su tutti i canali: {processed_messages} messaggi elaborati")
-        self.progress_callback({'percent': 100, 'status': 'Scansione storica completata'})
+        self.log_callback("✅ " + t("discord_bot.historical_scan_completed_all", count=processed_messages))
+        self.progress_callback({'percent': 100, 'status': t("discord_bot.historical_scan_completed_status")})
         self.initial_scan_done = True
         
     async def perform_incremental_scan_fast(self):

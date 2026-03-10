@@ -187,7 +187,7 @@ class DiscordBotThread(QThread):
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
 
-            self.log_signal.emit("🚀 Inizio bot Discord...")
+            self.log_signal.emit("🚀 " + t("discord_bot.bot_starting"))
             self.loop.run_until_complete(self.client.start(self.token))
 
         except asyncio.CancelledError:

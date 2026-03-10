@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}TCG Pocket Collection{% endblock %}
+{% block title %}{{ t('web.title') }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="mb-4">Collection Sets</h2>
+    <h2 class="mb-4">{{ t('web.collection_sets') }}</h2>
 
     <!-- Sets List - Compact Layout -->
     <div class="row">
@@ -24,7 +24,7 @@
                         <h6 class="card-title mb-2">{{ set.name }}</h6>
                         <small class="text-muted d-block">{{ set.code }}</small>
                         <small class="text-muted d-block">{{ set.release_date }}</small>
-                        <small class="text-muted d-block mb-2">{{ set.total_cards }} Cards</small>
+                        <small class="text-muted d-block mb-2">{{ set.total_cards }} {{ t('web.cards') }}</small>
                         
                         <div class="mt-2">
                             <span class="badge bg-primary">{{ set.owned }}/{{ set.total_cards }}</span>
@@ -39,7 +39,7 @@
 
     {% if not sets %}
     <div class="alert alert-info">
-        No sets found. Start scraping to add cards!
+        {{ t('web.no_sets_found') }}
     </div>
     {% endif %}
 </div>

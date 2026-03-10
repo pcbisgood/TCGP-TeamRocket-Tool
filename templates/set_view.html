@@ -4,15 +4,6 @@
 
 {% block content %}
 <div class="set-view">
-    <!-- ? DEBUG - Mostra i dati ricevuti -->
-    <div style="background: #333; padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 12px; color: #aaa;">
-        <p><strong>DEBUG:</strong></p>
-        <p>set_code: {{ set_code }}</p>
-        <p>set_name: {{ set_name }}</p>
-        <p>cards count: {{ cards|length }}</p>
-        <p>cover_path: {{ cover_path }}</p>
-    </div>
-
     <div class="set-header">
         <!-- ? COVER IMAGE -->
         {% if cover_path %}
@@ -20,42 +11,63 @@
                  alt="{{ set_name }} Cover" 
                  class="set-cover">
         {% else %}
-            <p style="color: #888;">No cover image</p>
+            <p style="color: #888;">{{ t('web.no_cover_image') }}</p>
         {% endif %}
 
         <div class="set-info">
             <h1>{{ set_code }} - {{ set_name }}</h1>
-            <p><strong>Released:</strong> {{ release_date }}</p>
-            <p><strong>Total Cards:</strong> {{ total_cards }}</p>
+            <p><strong>{{ t('web.released') }}</strong> {{ release_date }}</p>
+            <p><strong>{{ t('web.total_cards') }}</strong> {{ total_cards }}</p>
+        </div>
+    </div>
+
+    <!-- FILTER BUTTONS -->
+    <div class="filter-buttons mb-4">
+        <div class="btn-group" role="group">
+            <a href="/set/{{ set_code }}?filter=all" 
+               class="btn btn-sm {{ 'btn-primary' if filter_type == 'all' else 'btn-outline-primary' }}">
+                {{ t('web.filter_all') }}
+            </a>
+            <a href="/set/{{ set_code }}?filter=owned" 
+               class="btn btn-sm {{ 'btn-success' if filter_type == 'owned' else 'btn-outline-success' }}">
+                {{ t('web.filter_owned') }}
+            </a>
+            <a href="/set/{{ set_code }}?filter=missing" 
+               class="btn btn-sm {{ 'btn-warning' if filter_type == 'missing' else 'btn-outline-warning' }}">
+                {{ t('web.filter_missing') }}
+            </a>
         </div>
     </div>
 
     <!-- CARDS GRID -->
     <div class="cards-grid">
         {% for card in cards %}
-        <div class="card-item">
-            <!-- ? DEBUG: Mostra l'URL dell'immagine -->
-            <img src="/tcg_images/{{ set_code }}/{{ card.set_code }}_{{ card.card_number }}.webp" 
-                 alt="{{ card.card_name }}"
-                 class="card-image"
-                 loading="lazy"
-                 title="{{ card.set_code }}_{{ card.card_number }}.webp"
-                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22150%22 height=%22210%22%3E%3Crect fill=%22%23222%22 width=%22150%22 height=%22210%22/%3E%3Ctext x=%2275%22 y=%22105%22 text-anchor=%22middle%22 fill=%22%23888%22%3E%F0%9F%93%B7%3C/text%3E%3C/svg%3E'">
-            
-            <div class="card-info">
-                <p class="card-name">{{ card.card_name }}</p>
-                <p class="card-rarity">{{ card.rarity }}</p>
-                {% if card.quantity %}
-                    <p class="card-quantity">x{{ card.quantity }}</p>
-                {% endif %}
-            </div>
+        <div class="card-item" data-card-id="{{ card.id }}">
+            <a href="/card/{{ card.id }}">
+                <img src="/tcg_images/{{ set_code }}/{{ set_code }}_{{ '%03d' % (card.card_number|int) }}.webp" 
+                     alt="{{ card.card_name }}"
+                     class="card-image"
+                     loading="lazy"
+                     title="{{ set_code }}_{{ card.card_number }}"
+                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22150%22 height=%22210%22%3E%3Crect fill=%22%23222%22 width=%22150%22 height=%22210%22/%3E%3Ctext x=%2275%22 y=%22105%22 text-anchor=%22middle%22 fill=%22%23888%22%3E%F0%9F%93%B7%3C/text%3E%3C/svg%3E'">
+                
+                <div class="card-info">
+                    <p class="card-name">{{ card.card_name }}</p>
+                    <p class="card-rarity">{{ card.rarity }}</p>
+                    {% if card.quantity and card.quantity > 0 %}
+                        <p class="card-quantity">x{{ card.quantity }}</p>
+                    {% else %}
+                        <p class="card-missing">{{ t('web.filter_missing') }}</p>
+                    {% endif %}
+                </div>
+            </a>
         </div>
         {% endfor %}
     </div>
 
     {% if not cards %}
     <div class="empty-state">
-        <p>No cards found in this set.</p>
+        <p>{{ t('web.no_cards_found') }}</p>
     </div>
     {% endif %}
 </div>
@@ -94,6 +106,23 @@
     gap: 15px;
 }
 
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.filter-buttons .btn-group {
+    display: flex;
+    gap: 5px;
+}
+
+.filter-buttons .btn {
+    border-radius: 5px;
+    padding: 8px 16px;
+    text-decoration: none;
+}
+
 .card-item {
     background: #2a2a2a;
     border-radius: 8px;
@@ -103,6 +132,12 @@
 
 .card-item:hover {
     transform: scale(1.05);
+}
+
+.card-item a {
+    text-decoration: none;
+    color: inherit;
+    display: block;
 }
 
 .card-image {
@@ -134,6 +169,13 @@
     color: #00ff00;
     font-size: 11px;
     font-weight: bold;
+}
+
+.card-missing {
+    color: #ff6b6b;
+    font-size: 11px;
+    font-weight: bold;
+    font-style: italic;
 }
 
 .empty-state {

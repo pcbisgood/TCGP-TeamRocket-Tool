@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ card.card_name }} - Card Details{% endblock %}
+{% block title %}{{ card.card_name }} - {{ t('web.card_information') }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -28,17 +28,17 @@
             
             <div class="card mb-3 shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title">Card Information</h5>
+                    <h5 class="card-title">{{ t('web.card_information') }}</h5>
                     <hr>
                     <div class="row">
                         <div class="col-6">
-                            <p><strong>Set:</strong> {{ card.set_code }}</p>
+                            <p><strong>{{ t('web.set') }}</strong> {{ card.set_code }}</p>
                         </div>
                         <div class="col-6">
-                            <p><strong>Card Number:</strong> {{ card.card_number }}</p>
+                            <p><strong>{{ t('web.card_number') }}</strong> {{ card.card_number }}</p>
                         </div>
                         <div class="col-12">
-                            <p><strong>Rarity:</strong> <span class="badge bg-warning text-dark" style="font-size: 14px;">{{ card.rarity }}</span></p>
+                            <p><strong>{{ t('web.rarity') }}</strong> <span class="badge bg-warning text-dark" style="font-size: 14px;">{{ card.rarity }}</span></p>
                         </div>
                     </div>
                 </div>
@@ -47,7 +47,7 @@
             <!-- Ownership List -->
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-people-fill"></i> Owned By</h5>
+                    <h5 class="mb-0"><i class="bi bi-people-fill"></i> {{ t('web.owned_by') }}</h5>
                 </div>
                 <div class="card-body">
                     {% if owners %}
@@ -58,13 +58,13 @@
                             <span>
                                 <i class="bi bi-person-circle"></i> {{ owner.account_name }}
                             </span>
-                            <span class="badge bg-primary rounded-pill">{{ owner.quantity }} copies</span>
+                            <span class="badge bg-primary rounded-pill">{{ owner.quantity }} {{ t('web.copies') }}</span>
                         </a>
                         {% endfor %}
                     </div>
                     {% else %}
                     <p class="text-muted text-center mb-0">
-                        <i class="bi bi-inbox"></i> No one owns this card yet.
+                        <i class="bi bi-inbox"></i> {{ t('web.no_one_owns') }}
                     </p>
                     {% endif %}
                 </div>
@@ -74,7 +74,7 @@
 
     <div class="mt-4 mb-4">
         <a href="/" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Back to Collection
+            <i class="bi bi-arrow-left"></i> {{ t('web.back_to_collection') }}
         </a>
     </div>
 </div>

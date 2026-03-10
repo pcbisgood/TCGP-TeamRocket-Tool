@@ -1,0 +1,439 @@
+{
+  "wishlist": {
+    "hearted": "❤️",
+    "unhearted": "🤍"
+  },
+  "card": {
+    "placeholder": "🎴",
+    "error_icon": "❌",
+    "error_loading_image": "Errore caricamento immagine {path}: {error}",
+    "number_label": "#{number}"
+  },
+  "card_details": {
+    "error_loading_ownership": "Errore caricamento dati proprietà: {error}",
+    "error_getting_stats": "Errore recupero statistiche: {error}",
+    "info_label": "📁 {folder}\n📄 {file}"
+  },
+  "collection_card_dialog": {
+    "title": "{name} - Dettagli Carta",
+    "number_label": "Numero: #{number}",
+    "owned_by": "Posseduto da:",
+    "copies_badge": "{count} {count, plural, one {copia} other {copie}}",
+    "not_owned": "📭 Non posseduta da nessun account",
+    "qty_badge": "🃏 {quantity}",
+    "tooltip_remove_copy": "Rimuovi una copia",
+    "tooltip_add_copy": "Aggiungi una copia",
+    "tooltip_export_xml": "Esporta credenziali XML",
+    "tooltip_inject_account": "Inietta account (esegue inject_account.py)"
+  },
+  "mumu": {
+    "error_vms_not_found": "Errore critico: cartella 'vms' non trovata in {path}",
+    "scan_instances": "Scansione istanze in: {path}",
+    "found_instance_folder": "Trovata cartella istanza: {name}",
+    "warning_vm_config_not_found": "Avviso: 'vm_config.json' non trovato in {dir}. Salto.",
+    "error_adb_port_not_found": "Errore: impossibile trovare la porta ADB in {file}",
+    "found_player_name": "Trovato playerName: '{name}'",
+    "warning_extra_config_not_found": "Avviso: 'extra_config.json' non trovato, uso nome di fallback.",
+    "instance_uses_port": "Istanza '{name}' usa porta: {port}",
+    "error_reading_json": "Errore lettura JSON per {name}: {error}",
+    "warning_no_valid_instance_found": "Scansione completata, ma nessuna istanza valida trovata."
+  },
+  "adb": {
+    "error_title": "Errore ADB",
+    "command_not_found": "Comando ADB non trovato al percorso: {path}\nControlla il percorso nelle impostazioni.",
+    "timeout": "Timeout durante l'esecuzione di 'adb devices'.",
+    "scan_error": "Errore scansione ADB: {error}"
+  },
+  "language": "Italiano",
+  "language_code": "it",
+  
+  "app.title": "TCGP Team Rocket Tool",
+  
+  "stats": {
+    "title": "STATISTICHE DATABASE",
+    "sets": "SET",
+    "total_sets": "Totale Set: {count}",
+    "cards": "CARTE",
+    "total_cards": "Totale Carte: {count}",
+    "cards_by_rarity": "Carte per Rarità (Filtro Attivo):",
+    "no_rarity_selected": "(Nessuna rarità selezionata trovata)",
+    "accounts": "ACCOUNT",
+    "total_accounts": "Totale Account: {count}",
+    "total_inventory": "Totale Carte nell'Inventario: {count}",
+    "scanning_activity": "ATTIVITÀ DI SCANSIONE",
+    "total_found": "Totale Carte Trovate: {count}",
+    "top_10_accounts": "TOP 10 ACCOUNT (per conteggio carte):",
+    "top_10_cards": "TOP 10 CARTE PIÙ TROVATE:",
+    "cards": "{count} carte",
+    "found_times": "Trovate {count}x"
+  },
+  
+  "database": {
+    "not_found": "Database non trovato",
+    "not_found_message": "Esegui prima lo scraper nella scheda 'Impostazione Database'",
+    "table_cards_not_exists": "La tabella 'cards' non esiste ancora",
+    "table_cards_not_exists_in_db": "La tabella 'cards' non esiste nel database",
+    "loaded_successfully": "Database caricato con successo",
+    "ready_monitoring": "Pronto per iniziare il monitoraggio!",
+    "not_found_warning": "Database non trovato!",
+    "please_run_scraper": "Si prega di andare alla scheda 'Database Setup' ed eseguire prima lo scraper.",
+    "content_check": "Contenuto Database",
+    "sets_count": "Set",
+    "cards_count": "Carte"
+  },
+  
+  "migration": {
+    "adding_column_phash": "Aggiunta colonna 'phash' alla tabella cards...",
+    "migration_completed": "Migrazione completata",
+    "migration_error": "Errore migrazione",
+    "adding_message_id_column": "Aggiunta colonna 'message_id' alla tabella found_cards...",
+    "message_id_column_added": "Colonna message_id aggiunta con successo"
+  },
+  
+  "template_hash": {
+    "loaded": "Caricati {count} template hash dal database",
+    "loading_error": "Errore caricamento template hash",
+    "none_found": "Nessun template hash trovato nella base de dati"
+  },
+  
+  "phash": {
+    "updating": "Aggiornamento pHash per {count} carte...",
+    "progress": "Progresso: {updated}/{total}",
+    "error_card": "Errore per carta {card_id}",
+    "updated": "Aggiornati {count} valori pHash"
+  },
+  
+  "layout": {
+    "invalid_detected": "Layout rilevato ({layout}) non valido, uso default 4",
+    "detection_error": "Errore rilevamento layout, uso default 4",
+    "hash_error": "Errore calcolo hash",
+    "not_supported": "Layout {layout} non supportato per {image_path}",
+    "detected": "Rilevato layout: {layout} carte - {filename}"
+  },
+  
+  "card_scanner": {
+    "position_no_match": "Posizione {idx}: Nessun match trovato",
+    "scan_error": "Errore scansione immagine",
+    "inventory_update_error": "Errore aggiornamento inventario"
+  },
+  
+  "proxy": {
+    "download_from_api": "Download proxy da API...",
+    "saved": "Salvati {count} proxy in {file}",
+    "none_found": "Nessun proxy trovato nell'API",
+    "download_error": "Errore download proxy",
+    "setup_db_error": "Errore setup database",
+    "loaded": "Caricati {count} proxy",
+    "no_proxy": "Scraping senza proxy"
+  },
+  
+  "scraper": {
+    "retrieving_sets_error": "Errore recupero set",
+    "retrieving_sets": "Recupero lista set...",
+    "sets_found": "Trovati {count} set",
+    "upscaled": "Upscaled: {original} → {upscaled}",
+    "cover_downloaded": "Cover ({mode}) scaricata, ingrandita (2x) e ottimizzata ({size}KB)",
+    "cover_error": "Errore scaricamento/miglioramento cover",
+    "set_error": "Errore carte set {code}",
+    "saving_set_error": "Errore salvataggio set nel DB",
+    "card_error": "Errore carta {number}",
+    "processing_set": "Elaborazione set: {code} - {name}",
+    "downloading_cover": "{code}: Download cover...",
+    "cover_saved": "{code}: Cover salvata ✓",
+    "no_cards_found": "Nessuna carta trovata per il set {code}",
+    "found_cards": "Trovate {count} carte nel set {code}",
+    "progress": "Progresso: {idx}/{total} carte elaborate...",
+    "processing_card_error": "Errore elaborazione carta"
+  },
+  
+  "card_details_ui": {
+    "title": "{name} - Dettagli Carta",
+    "open_card_image_folder": "📁 Apri Cartella Immagine Carta",
+    "ownership_information": "📊 Informazioni Proprietà",
+    "close": "✖ Chiudi",
+    "open_xml_folder": "📄 Apri Cartella XML",
+    "open_folder": "📁 Apri Cartella",
+    "failed_load_ownership": "Impossibile caricare i dati di proprietà",
+    "card_image_not_found": "Immagine carta non trovata",
+    "xml_folder_not_found": "Cartella XML non trovata per {account}",
+    "cannot_open_folder": "Impossibile aprire la cartella: {error}"
+  },
+  
+  "cloudflare": {
+    "password_setup": "Setup Password Cloudflare",
+    "configure_password": "Configura Password per Cloudflare",
+    "configure_password_title": "Configura Password per Cloudflare",
+    "password_placeholder": "Inserisci una password sicura (minimo 6 caratteri)...",
+    "password_info": "IMPORTANTE:\n\n• Accesso LOCALE (localhost): NON richiede password\n• Accesso PUBBLICO (Cloudflare): RICHIEDE password\n\nLa password proteggerà l'accesso quando condividi via Cloudflare.",
+    "password_tip": "Consiglio: Salva questa password in un posto sicuro!",
+    "password_info": "Questa password proteggerà il tuo accesso durante la condivisione via Cloudflare.\nMinimo 6 caratteri.",
+    "password": "Password:",
+    "save_password": "💾 Salva Password",
+    "cancel": "Annulla",
+    "password_already_set": "✅ Una password è già impostata (puoi modificarla)",
+    "no_password_set": "ℹ️ Nessuna password impostata",
+    "password_empty": "La password non può essere vuota!",
+    "password_min_length": "La password deve essere di almeno 6 caratteri!",
+    "password_saved": "Password salvata con successo!",
+    "error_saving": "Errore durante il salvataggio: {error}",
+    "qr_code_error": "⚠️ Installa 'qrcode[pil]' per vedere il QR code",
+    "password_configured_body": "✅ Password configurata!\n\nL'URL pubblico sarà protetto da password.",
+    "password_configured_title": "ℹ️ Impostazione Cloudflare",
+    "tunnel_error_title": "Errore Tunnel",
+    "stop_tunnel_button": "Ferma Tunnel",
+    "public_url_log": "✅ URL: {url}",
+    "log_prefix": "[Cloudflare] {message}",
+    "tunnel_error_critical_title": "Errore Critico Tunnel Cloudflare",
+    "url_dialog_title": "URL",
+    "url_dialog_text": "URL:\n{public_url}",
+    "copy_button": "Copia",
+    "open_button": "Apri"
+  },
+  
+  "discord_bot": {
+    "background_connection_start": "Connessione leggera in background per recuperare i canali...",
+    "thread_completed": "Thread leggero completato.",
+    "background_connection_error": "Errore connessione background: {e}",
+    "bot_starting": "Inizio bot Discord...",
+    "database_empty_scan": "Database vuoto. Inizio scansione storica completa...",
+    "database_existing_trades": "Database esistente con {count} trade.",
+    "start_full_historical_scan": "Inizio scansione storica completa...",
+    "start_realtime_monitoring": "Inizio monitoraggio messaggi in tempo reale...",
+    "start_historical_scan_channel": "Inizio scansione storica su Canale '{channel}' ({current}/{total})...",
+    "historical_scan_completed_channel": "Scansione storica completata su Canale '{channel}'.",
+    "historical_scan_completed_all": "Scansione storica completata su tutti i canali: {count} messaggi elaborati",
+    "historical_scan_completed_status": "Scansione storica completata"
+  },
+  
+  "bot_status": {
+    "starting": "Stato: 🟡 Avvio...",
+    "stopped": "Stato: ⚫ Arrestato",
+    "monitoring": "Monitoraggio",
+    "status_text": "Stato: {icon} {status}"
+  },
+  
+  "scraper_ui": {
+    "start_database_setup": "▶ Avvia Database Setup",
+    "stop_scraper": "⏹ Stop Scraper",
+    "update_phash": "🔄 Aggiorna pHash per Immagini Esistenti",
+    "check_database": "🔍 Controlla Database",
+    "progress": "⏳ Progresso",
+    "scraper_log": "📝 Log Scraper",
+    "download_card_images": "Scarica Immagini Carte",
+    "scraper_configuration": "Configurazione Scraper",
+    "confirm_scraping": "Conferma",
+    "confirm_message": "Questo scaricherà tutti i dati delle carte dal sito web. Continuare?",
+    "database_check": "Controllo Database",
+    "error_checking_db": "Impossibile controllare il database: {error}",
+    "progress_total": "Progresso totale:",
+    "ready": "Pronto"
+  },
+  
+  "dialogs": {
+    "injection_running": "In esecuzione...",
+    "injection_done": "Fatto (Registra Scambio)",
+    "injection_completed_message": "Iniezione completata. L'app Pokémon si sta avviando.",
+    "close_error": "Chiudi (Errore)",
+    "injection_account_title": "Iniezione Account: {name}",
+    "injection_start_title": "Avvio iniezione ADB per {name}",
+    "close_button": "Chiudi",
+    "injection_finished_log": "Iniezione terminata.",
+    "trade_not_registered_log": "Scambio non registrato dall'utente.",
+    "manual_trade_title": "Scambio Manuale",
+    "manual_trade_prompt": "Quante carte sono state scambiate?",
+    "select_instance_title": "Seleziona Istanza",
+    "select_instance_label": "Seleziona l'istanza MuMu di destinazione:",
+    "no_instance_active": "Nessuna istanza MuMu attiva trovata:",
+    "instance_running": "In Esecuzione",
+    "instance_stopped": "Spenta"
+  },
+  
+  "cards_found": {
+    "refresh_list": "🔄 Refresh Lista",
+    "refresh_list_tooltip": "Svuota la cache delle immagini e ricarica la lista dal database."
+  },
+  
+  "card_image": {
+    "corrupted_blob": "Immagine corrotta (BLOB)",
+    "not_found": "Immagine non trovata"
+  },
+  
+  "collection_ui": {
+    "account": "Account:",
+    "configure_cloudflare": "☁️ Configura Cloudflare",
+    "expose_publicly": "📱 Esponi Pubblicamente (Cloudflare)",
+    "refresh_collection": "🔄 Aggiorna Collezione",
+    "loading_collection": "Caricamento collezione...",
+    "database_not_found": "Database non trovato. Si prega di eseguire prima lo scraper.",
+    "search": "Cerca:",
+    "search_placeholder": "Nome carta, numero, set...",
+    "ownership_filter": "Possesso:",
+    "rarity_filter": "Rarità:",
+    "filter_all": "Tutte",
+    "filter_owned": "Possedute",
+    "filter_missing": "Mancanti",
+    "stats_label": "📊 Totale: {total_owned}/{total_cards} carte ({completion:.1f}% completo) | Account: {selected_account}"
+  },
+  
+  "stats_ui": {
+    "refresh_statistics": "🔄 Aggiorna Statistiche"
+  },
+
+  "error.title": "Errore",
+  "error.db_connection_failed_title": "❌ Errore Database",
+  "error.db_connection_failed_body": "Impossibile connettersi al database",
+  "error.db_manager_connection_failed_title": "Errore DB Manager",
+    "error.db_manager_connection_failed_body": "Impossibile connettersi al Database Manager. La wishlist non funzionerà.",
+    "error.folder_open_failed_title": "Errore Apertura Cartella",
+    "error.folder_open_failed_body": "Impossibile aprire la cartella: {e}",
+    "error.generic_body": "Errore: {e}",
+  
+    "warning.title": "Attenzione",
+    "warning.db_not_found": "Database non trovato. Avvia prima lo scraper.",
+    "warning.select_one_channel": "Seleziona almeno un canale da scansionare.",
+
+  "info.title": "Info",
+
+  "channel": {
+    "checkbox_label": "#{channel_name} ({channel_id})"
+  },
+
+  "app.restarting": "🔄 Riavvio dell'applicazione...",
+  "app.restart_failed_title": "Riavvio Fallito",
+    "app.restart_failed_body": "Impossibile riavviare l'applicazione: {e}\n\nRiavvia manualmente.",
+  "download.failed_title": "Download Fallito",
+  "download.cloudflared_failed": "Impossibile scaricare cloudflared: {e}\n\nScaricalo manualmente da:\nhttps://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/\n\ne posiziona 'cloudflared.exe' in:\n{app_dir}",
+
+  "credits": {
+    "dialog_title": "Crediti",
+    "html_content": "<div style=\"color: #e0e0e0; font-family: 'Segoe UI', Arial, sans-serif;\">\n            <p style=\"font-size: 13px; font-weight: bold; color: #3498db; margin-bottom: 10px;\">\n                🎴 Pokemon TeamRocket Tool\n            </p>\n            \n            <p style=\"margin-bottom: 12px;\">\n                Grazie per aver scaricato <b>Pokemon TeamRocket Tool</b>!<br>\n                Creato da <b style=\"color: #e74c3c;\">pcb.is.good</b>, \n                progettato per funzionare con \n                <a href=\"https://github.com/Arturo-1212/PTCGPB\" \n                style=\"color: #3498db; text-decoration: none;\">\n                    Arturo-1212/PTCGPB\n                </a>.\n            </p>\n            \n            <p style=\"font-size: 12px; font-weight: bold; color: #f39c12; margin-top: 15px; margin-bottom: 8px;\">\n                💝 Ringraziamenti Speciali:\n            </p>\n            <ul style=\"margin-left: 20px; margin-top: 5px;\">\n                <li style=\"margin-bottom: 5px;\">\n                    <b>Arturo</b> (Creatore del Bot) - \n                    <a href=\"https://github.com/Arturo-1212\" \n                    style=\"color: #3498db; text-decoration: none;\">\n                        Arturo-1212\n                    </a>\n                </li>\n                <li style=\"margin-bottom: 5px;\">\n                    <b>GummyBaer</b> (Feedback + Algoritmo di matching per carte e pacchetti)\n                </li>\n            </ul>\n            \n            <p style=\"margin-top: 15px; margin-bottom: 8px;\">\n                Per qualsiasi domanda, fai riferimento al Discord ufficiale del bot:\n            </p>\n            <p style=\"margin-left: 20px;\">\n                🔗 <a href=\"https://discord.gg/Msa5vNjUUf\" \n                    style=\"color: #7289da; text-decoration: none; font-weight: bold;\">\n                    discord.gg/Msa5vNjUUf\n                </a>\n            </p>\n            \n            <hr style=\"border: none; border-top: 1px solid #555; margin: 15px 0;\">\n            \n            <p style=\"font-size: 10px; color: #888; text-align: center;\">\n                Versione 1.0 | Creato con ❤️ per la community di TCG Pocket\n            </p>\n        </div>"
+  },
+
+  "trade_log.reset_title": "Resetta Log Trade",
+  "trade_log.reset_warning": "Stai per cancellare tutto il log dei trade.\n\nAl prossimo avvio, il bot eseguirà una scansione storica completa di Discord.\n\nSei sicuro?",
+  "trade_log.already_empty": "Il log dei trade è già vuoto.",
+  "trade_log.reset_success": "Log dei trade resettato. {count} righe eliminate.",
+  "trade_log.reset_error_title": "Errore Reset Log",
+  "trade_log.reset_error_body": "Impossibile resettare il log dei trade: {e}",
+  "ui": {
+    "window_title": "TCGP Team Rocket Tool",
+    "discord_bot_tab_with_icon": "🤖 Bot Discord",
+    "cards_found_tab_with_icon": "🎴 Carte Trovate",
+    "collection_tab_with_icon": "📚 Collezione",
+    "accounts_tab_with_icon": "👤 Account",
+    "database_setup_tab_with_icon": "💾 Impostazione Database",
+    "statistics_tab_with_icon": "📊 Statistiche",
+    "settings": "Impostazioni",
+    "config_group_with_icon": "🔧 Configurazione",
+    "start_bot": "▶ Avvia Bot",
+    "stop_bot": "⏹ Ferma Bot",
+    "channel_available_text": "Canali Disponibili",
+    "bot_token_lable": "Token Bot:",
+    "open_web_viewer": "🖥️ Apri Web Viewer",
+    "open_web": "🌐 Apri nel Browser",
+    "close_button": "✅ Chiudi",
+    "show_qr": "💡 Condividi questo URL o scansiona il QR code per accedere alla tua collezione ovunque!",
+    "collection_ready": "🌐 La tua collezione è ora online!",
+    "cloudflare_ready": "Cloudflare Tunnel Pronto",
+    "channel_available": "Avvia il Bot per recuperare tutti i canali Discord.",
+    "copy_url": "📋 Copia URL",
+    "recover_history": "🔄 Recupera Cronologia",
+    "recover_history_confirmation": "Vuoi avviare il recupero della cronologia dall'ultimo messaggio processato?\n\nQuesta operazione scansionerà tutti i messaggi Discord dall'ultimo processato per recuperare le carte mancanti.",
+    "no_channel_found": "Nessun canale testuale trovato con permessi di lettura.",
+    "enter_discord_token": "Inserisci il token del bot Discord",
+    "channels_configured": "Canali Configurati: {count}",
+    "status_group_with_icon": "📊 Stato",
+    "progress": "Progresso",
+    "log_group_with_icon": "📝 Log",
+    "recent_trades_group_with_icon": "📦 Trade Recenti",
+    "discord_bot_tab_with_icon": "🤖 Bot Discord",
+    "error": "Errore",
+    "info": "Informazione",
+    "success": "Successo",
+    "delete_done": "Inventario resettato con successo.",
+    "inventory_full": "L'inventario è già vuoto.",
+    "are_sure": "CONFERMA FINALE",
+    "last_hope": "Questa è la tua ultima possibilità. Tutti i dati della collezione saranno persi.",
+    "reset_inventory": "🔄 Reset Inventario",
+    "warning_message": "ATTENZIONE!\n\nStai per cancellare tutto il tuo inventario (la tua Collezione).\n\n",
+    "cannot_undone": "Questa operazione NON può essere annullata. Sei sicuro?",
+    "found_cards_cleared": "✅ {count} voci rimosse dalla cronologia carte trovate.",
+    "error_clearing_found_cards": "Errore durante la cancellazione delle carte trovate",
+    "no_found_cards_to_clear": "Nessuna carta trovata da cancellare. La tabella found_cards è già vuota.",
+    "tray": {
+      "show": "Mostra",
+      "quit": "Esci"
+    },
+    "app_running_in_background": "L'app è in esecuzione in background",
+    "bot_must_be_running": "Il bot Discord deve essere in esecuzione per recuperare la cronologia.",
+    "bot_not_ready": "Il bot Discord non è ancora pronto. Attendi qualche istante.",
+    "wait_for_initial_scan": "Attendi il completamento della scansione iniziale prima di avviare il recupero della cronologia.",
+    "all_accounts": "Tutti gli Account",
+    "language": "Lingua",
+    "language_changed_message": "La lingua è stata cambiata in {language}.",
+    "restart_required": "Riavvia l'applicazione per applicare tutte le modifiche.",
+    "settings_tab": {
+      "rarity_filter_group": "🎴 Impostazioni Filtro Rarità",
+      "bot_path_group": "🤖 Percorso Bot (AHK)",
+      "bot_path_placeholder": "Percorso della cartella contenente gli script .ahk (es. 1.ahk, 2.ahk...)",
+      "browse_button": "Sfoglia...",
+      "notification_group_title": "🔔 Impostazioni Notifiche",
+      "notification_channel_placeholder": "ID canale Discord per notifiche (diverso dal canale scansione)",
+      "notification_enable_checkbox": "Abilita notifiche personalizzate (futuro)",
+      "notification_channel_label": "ID Canale Notifiche:",
+      "theme_label": "Tema:",
+      "dark_theme_checkbox": "Tema Scuro (Default)",
+      "autostart_checkbox": "Avvia automaticamente il bot all'avvio",
+      "minimize_to_tray_checkbox": "Minimizza nella tray di sistema",
+      "clear_cards_log_button": "Cancella Log Carte",
+      "clear_cards_log_tooltip": "Cancella solo la tabella 'found_cards' (scheda 'Carte Trovate'). Non resetta l'inventario.",
+      "reset_inventory_button": "Resetta Inventario",
+      "reset_inventory_tooltip": "ATTENZIONE: Cancella la tabella 'account_inventory'. Perderai i conteggi della collezione.",
+      "reset_trades_button": "Resetta Trade (Riscansione)",
+      "reset_trades_tooltip": "ATTENZIONE: Cancella la tabella 'trades'. Al prossimo avvio, il bot eseguirà una scansione storica completa.",
+      "open_data_folder_button": "📂 Apri Cartella Dati",
+      "open_data_folder_tooltip": "Apre la cartella AppData dove sono salvati database, log e impostazioni.",
+      "show_info_tooltip": "Mostra info e crediti"
+    },
+    "application_settings": "Impostazioni Applicazione",
+    "database_management": "Gestione Database",
+    "dialog": {
+      "clear_found_cards_log_title": "Cancella Log Carte Trovate",
+      "clear_found_cards_log_text": "Stai per cancellare il log delle carte trovate (scheda 'Carte Trovate').\n\nQuesto NON resetta l'inventario della collezione.\n\nSei sicuro di voler continuare?"
+    },
+    "cards_found": "Carte Trovate",
+    "showing": "Visualizzazione",
+    "table": {
+      "preview": "Anteprima",
+      "account": "Account",
+      "cards_found": "Carte Trovate",
+      "xml": "XML",
+      "image": "Immagine",
+      "card": "Carta",
+      "pack": "Pacchetto",
+      "set": "Set",
+      "set_cover": "Copertina set",
+      "card_number": "Numero Carta",
+      "card_name": "Nome Carta",
+      "rarity": "Rarità",
+      "copies": "Copie",
+      "actions": "Azioni"
+    }
+  },
+
+  "accounts": {
+    "title": "Gestione Account",
+    "title_searching": "Gestione Account (Ricerca...)",
+    "title_found": "Gestione Account (Trovati: {count})",
+    "total_accounts": "Totale Account: {count}",
+    "no_accounts_title": "Nessun Account Trovato",
+    "no_accounts_message": "Aggiungi un account per iniziare.",
+    "search_placeholder": "Cerca account per nome o alias (min. 3 caratteri)...",
+    "sort_label": "Ordina:",
+    "reload_tooltip": "Ricarica account",
+    "loading": "Caricamento...",
+    "sort_by_dust_tooltip": "Ordina per Shiny Dust (clicca per alternare)",
+    "sort_by_hourglass_tooltip": "Ordina per Clessidre (clicca per alternare)",
+    "alias_placeholder": "Alias account…"
+  }
+}

@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}Statistiche - TCG Pocket Collection{% endblock %}
+{% block title %}{{ t('web.statistics') }} - {{ t('web.title') }}{% endblock %}
 
 {% block content %}
 <div class="text-center mb-5">
     <h1 class="display-5 fw-bold mb-3">
-        <i class="bi bi-graph-up"></i> Statistiche Collezione
+        <i class="bi bi-graph-up"></i> {{ t('web.collection_stats') }}
     </h1>
-    <p class="lead text-light">Panoramica completa della tua collezione</p>
+    <p class="lead text-light">{{ t('web.overview') }}</p>
 </div>
 
 <div class="row g-4 mb-4">
     <div class="col-md-6">
         <div class="card-custom p-4">
-            <h4 class="mb-4"><i class="bi bi-trophy-fill"></i> Top 5 Account</h4>
+            <h4 class="mb-4"><i class="bi bi-trophy-fill"></i> {{ t('web.top_accounts') }}</h4>
             
             {% if top_accounts %}
             <div class="list-group list-group-flush bg-transparent">
@@ -23,7 +23,7 @@
                         <strong>{{ account.account_name }}</strong>
                         <br>
                         <small class="text-muted">
-                            {{ account.unique_cards }} carte diverse
+                            {{ account.unique_cards }} {{ t('web.different_cards') }}
                         </small>
                     </div>
                     <span class="badge rounded-pill" 
@@ -34,14 +34,14 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-muted text-center py-4">Nessun dato disponibile</p>
+            <p class="text-muted text-center py-4">{{ t('web.no_data_available') }}</p>
             {% endif %}
         </div>
     </div>
     
     <div class="col-md-6">
         <div class="card-custom p-4">
-            <h4 class="mb-4"><i class="bi bi-star-fill"></i> Carte Più Possedute</h4>
+            <h4 class="mb-4"><i class="bi bi-star-fill"></i> {{ t('web.most_owned_cards') }}</h4>
             
             {% if top_cards %}
             <div class="list-group list-group-flush bg-transparent">
@@ -71,14 +71,14 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-muted text-center py-4">Nessun dato disponibile</p>
+            <p class="text-muted text-center py-4">{{ t('web.no_data_available') }}</p>
             {% endif %}
         </div>
     </div>
 </div>
 
 <div class="card-custom p-4">
-    <h4 class="mb-4"><i class="bi bi-gem"></i> Statistiche per Rarità</h4>
+    <h4 class="mb-4"><i class="bi bi-gem"></i> {{ t('web.rarity_stats') }}</h4>
     
     {% if rarity_stats %}
     <div class="row g-3">
@@ -97,7 +97,7 @@
                     {% endif %}
                 </div>
                 <div class="stat-number">{{ stat.total_copies }}</div>
-                <small class="text-muted">{{ stat.unique_cards }} carte diverse</small>
+                <small class="text-muted">{{ stat.unique_cards }} {{ t('web.different_cards_label') }}</small>
             </div>
         </div>
         {% endfor %}

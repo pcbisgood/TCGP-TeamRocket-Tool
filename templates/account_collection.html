@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}{{ account_name }}'s Collection{% endblock %}
+{% block title %}{{ t('web.account_collection', account=account_name) }}{% endblock %}
 
 {% block content %}
 <div class="account-collection">
-    <h1>{{ account_name }}'s Collection</h1>
+    <h1>{{ t('web.account_collection', account=account_name) }}</h1>
     
     <div class="collection-stats">
         <div class="stat-card">
-            <h3>Unique Cards</h3>
+            <h3>{{ t('web.unique_cards') }}</h3>
             <p class="stat-value">{{ total_unique }}</p>
         </div>
         <div class="stat-card">
-            <h3>Total Copies</h3>
+            <h3>{{ t('web.total_copies') }}</h3>
             <p class="stat-value">{{ total_copies }}</p>
         </div>
         <div class="stat-card">
-            <h3>Sets Owned</h3>
+            <h3>{{ t('web.sets_owned') }}</h3>
             <p class="stat-value">{{ sets_data|length }}</p>
         </div>
     </div>
@@ -55,7 +55,7 @@
 
     {% if not sets_data %}
     <div class="empty-state">
-        <p>No collections found for this account.</p>
+        <p>{{ t('web.no_collections_found') }}</p>
     </div>
     {% endif %}
 </div>

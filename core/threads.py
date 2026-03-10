@@ -187,7 +187,7 @@ class DiscordBotThread(QThread):
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
 
-            self.log_signal.emit("🚀 Inizio bot Discord...")
+            self.log_signal.emit("🚀 " + t("discord_bot.bot_starting"))
             self.loop.run_until_complete(self.client.start(self.token))
 
         except asyncio.CancelledError:
@@ -454,7 +454,7 @@ class DiscordChannelLoaderThread(QThread):
 
     def run(self):
         try:
-            self.log_signal.emit("🚀 Connessione leggera in background per recuperare i canali...")
+            self.log_signal.emit("🚀 " + t("discord_bot.background_connection_start"))
 
             intents = discord.Intents.default()
             intents.message_content = False
@@ -471,7 +471,7 @@ class DiscordChannelLoaderThread(QThread):
             self.loop.run_until_complete(self.client.start(self.token))
 
         except Exception as e:
-            self.log_signal.emit(f"❌ Errore connessione background: {e}")
+            self.log_signal.emit("❌ " + t("discord_bot.background_connection_error", e=str(e)))
         finally:
             if self.loop and self.loop.is_running():
                 self.loop.stop()
@@ -479,4 +479,4 @@ class DiscordChannelLoaderThread(QThread):
                 self.loop.run_until_complete(self.client.close())
             if self.loop:
                  self.loop.close()
-            self.log_signal.emit("✅ Thread leggero completato.")
+            self.log_signal.emit("✅ " + t("discord_bot.thread_completed"))

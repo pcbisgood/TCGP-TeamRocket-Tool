@@ -50,6 +50,26 @@
     "tooltip_export_xml": "Export XML credentials",
     "tooltip_inject_account": "Inject account (runs inject_account.py)"
   },
+  "bot_status": {
+    "starting": "Status: 🟡 Starting...",
+    "stopped": "Status: ⚫ Stopped",
+    "monitoring": "Monitoring",
+    "status_text": "Status: {icon} {status}"
+  },
+  "discord_bot": {
+    "background_connection_start": "Light background connection to fetch channels...",
+    "thread_completed": "Thread completed.",
+    "background_connection_error": "Background connection error: {e}",
+    "bot_starting": "Starting Discord bot...",
+    "database_empty_scan": "Database empty. Starting full historical scan...",
+    "database_existing_trades": "Existing database with {count} trade(s).",
+    "start_full_historical_scan": "Starting full historical scan...",
+    "start_realtime_monitoring": "Starting real-time message monitoring...",
+    "start_historical_scan_channel": "Starting historical scan on channel « {channel} » ({current}/{total})...",
+    "historical_scan_completed_channel": "Historical scan completed on channel « {channel} ».",
+    "historical_scan_completed_all": "Historical scan completed on all channels: {count} messages processed",
+    "historical_scan_completed_status": "Historical scan completed"
+  },
   "ui": {
     "window_title": "TCGP Team Rocket Tool",
     "cloudflare_ready": "Cloudflare Tunnel Ready",
@@ -74,6 +94,8 @@
     "recent_trades_group_with_icon": "📦 Recent Trades",
     "discord_bot_tab_with_icon": "🤖 Discord Bot",
     "cards_found_tab_with_icon": "🎴 Cards Found",
+    "cards_found": "Cards Found",
+    "showing": "Showing",
     "collection_tab_with_icon": "📚 Collection",
     "database_setup_tab_with_icon": "💾 Database Setup",
     "statistics_tab_with_icon": "📊 Statistics",
@@ -202,6 +224,7 @@
       "card": "Card",
       "pack": "Pack",
       "set": "Set",
+      "set_cover": "Set cover",
       "card_number": "Card #",
       "card_name": "Card Name",
       "rarity": "Rarity",
@@ -213,5 +236,84 @@
     "web_server_running_message": "Flask web server is running!",
     "url_label": "URL:",
     "browser_will_open": "Your browser will open automatically."
+  },
+  "accounts": {
+    "title": "Account Management",
+    "title_searching": "Account Management (Searching...)",
+    "title_found": "Account Management (Found: {count})",
+    "total_accounts": "Total Accounts: {count}",
+    "no_accounts_title": "No Account Found",
+    "no_accounts_message": "Add an account to get started.",
+    "search_placeholder": "Search account by name or alias (min. 3 characters)...",
+    "sort_label": "Sort:",
+    "reload_tooltip": "Reload accounts",
+    "loading": "Loading...",
+    "sort_by_dust_tooltip": "Sort by Shiny Dust (click to toggle)",
+    "sort_by_hourglass_tooltip": "Sort by hourglasses (click to toggle)",
+    "alias_placeholder": "Account alias…"
+  },
+  "scraper_ui": {
+    "progress_total": "Total progress:",
+    "ready": "Ready"
+  },
+  "dialogs": {
+    "injection_running": "Running...",
+    "injection_done": "Done (Register Exchange)",
+    "close_error": "Close (Error)",
+    "injection_account_title": "Account injection: {name}",
+    "injection_start_title": "Starting ADB injection for {name}",
+    "close_button": "Close",
+    "injection_completed_message": "Injection complete. The Pokémon app is starting.",
+    "injection_finished_log": "Injection finished.",
+    "trade_not_registered_log": "Trade not registered by user.",
+    "manual_trade_title": "Manual trade",
+    "manual_trade_prompt": "How many cards were traded?",
+    "select_instance_title": "Select Instance",
+    "select_instance_label": "Select the target MuMu instance:",
+    "no_instance_active": "No active MuMu instance found:",
+    "instance_running": "Running",
+    "instance_stopped": "Stopped"
+  },
+  "cards_found": {
+    "refresh_list": "🔄 Refresh list",
+    "refresh_list_tooltip": "Clear image cache and reload the list from the database."
+  },
+  "cloudflare": {
+    "password": "Password:",
+    "save_password": "Save password",
+    "cancel": "Cancel",
+    "configure_password_title": "Configure Cloudflare password",
+    "password_placeholder": "Enter a secure password (minimum 6 characters)...",
+    "password_info": "IMPORTANT:\n\n• LOCAL access (localhost): No password required\n• PUBLIC access (Cloudflare): Password REQUIRED\n\nThe password will protect access when sharing via Cloudflare.",
+    "password_tip": "Tip: Save this password in a safe place!",
+    "password_already_set": "A password is already set (you can change it)",
+    "no_password_set": "No password set",
+    "password_empty": "Password cannot be empty!",
+    "password_min_length": "Password must be at least 6 characters!",
+    "password_saved": "Password saved successfully!",
+    "error_saving": "Error saving: {error}",
+    "qr_code_error": "Install 'qrcode[pil]' to display the QR code",
+    "password_configured_body": "Password configured! The public URL will be password protected.",
+    "password_configured_title": "Cloudflare setup",
+    "tunnel_error_title": "Tunnel error",
+    "stop_tunnel_button": "Stop tunnel",
+    "public_url_log": "URL: {url}",
+    "log_prefix": "[Cloudflare] {message}",
+    "tunnel_error_critical_title": "Cloudflare tunnel critical error",
+    "url_dialog_title": "URL",
+    "url_dialog_text": "URL:\n{public_url}",
+    "copy_button": "Copy",
+    "open_button": "Open"
+  },
+  "card_image": {
+    "corrupted_blob": "Corrupted image (BLOB)",
+    "not_found": "Image not found"
+  },
+  "channel": {
+    "checkbox_label": "#{channel_name} ({channel_id})"
+  },
+  "credits": {
+    "dialog_title": "Credits",
+    "html_content": "<div style=\"color: #e0e0e0; font-family: 'Segoe UI', Arial, sans-serif;\">\n            <p style=\"font-size: 13px; font-weight: bold; color: #3498db; margin-bottom: 10px;\">\n                🎴 Pokemon TeamRocket Tool\n            </p>\n            \n            <p style=\"margin-bottom: 12px;\">\n                Thanks for downloading <b>Pokemon TeamRocket Tool</b>!<br>\n                Created by <b style=\"color: #e74c3c;\">pcb.is.good</b>, \n                designed to work with \n                <a href=\"https://github.com/Arturo-1212/PTCGPB\" \n                style=\"color: #3498db; text-decoration: none;\">\n                    Arturo-1212/PTCGPB\n                </a>.\n            </p>\n            \n            <p style=\"font-size: 12px; font-weight: bold; color: #f39c12; margin-top: 15px; margin-bottom: 8px;\">\n                💝 Special Thanks:\n            </p>\n            <ul style=\"margin-left: 20px; margin-top: 5px;\">\n                <li style=\"margin-bottom: 5px;\">\n                    <b>Arturo</b> (Bot Creator) - \n                    <a href=\"https://github.com/Arturo-1212\" \n                    style=\"color: #3498db; text-decoration: none;\">\n                        Arturo-1212\n                    </a>\n                </li>\n                <li style=\"margin-bottom: 5px;\">\n                    <b>GummyBaer</b> (Feedback + Card and pack matching algorithm)\n                </li>\n            </ul>\n            \n            <p style=\"margin-top: 15px; margin-bottom: 8px;\">\n                For any questions, refer to the bot's official Discord:\n            </p>\n            <p style=\"margin-left: 20px;\">\n                🔗 <a href=\"https://discord.gg/Msa5vNjUUf\" \n                    style=\"color: #7289da; text-decoration: none; font-weight: bold;\">\n                    discord.gg/Msa5vNjUUf\n                </a>\n            </p>\n            \n            <hr style=\"border: none; border-top: 1px solid #555; margin: 15px 0;\">\n            \n            <p style=\"font-size: 10px; color: #888; text-align: center;\">\n                Version 1.0 | Built with ❤️ for the TCG Pocket community\n            </p>\n        </div>"
   }
 }

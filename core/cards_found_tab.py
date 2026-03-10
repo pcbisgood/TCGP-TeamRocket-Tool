@@ -101,8 +101,8 @@ class CardsFoundTab(QWidget):
         controls_layout = QHBoxLayout()
         
         # Pulsante Refresh Cache
-        self.refresh_btn = QPushButton("🔄 Refresh Lista")
-        self.refresh_btn.setToolTip("Svuota la cache delle immagini e ricarica la lista dal database.")
+        self.refresh_btn = QPushButton(t("cards_found.refresh_list"))
+        self.refresh_btn.setToolTip(t("cards_found.refresh_list_tooltip"))
         self.refresh_btn.clicked.connect(self.refresh_list_and_cache)
         controls_layout.addWidget(self.refresh_btn)
         

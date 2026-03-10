@@ -937,7 +937,7 @@ class CollapsibleAccountWidget(QWidget):
 
         # Alias (EDITABILE)
         self.alias_edit = QLineEdit(self.account_data.get('alias') or "")
-        self.alias_edit.setPlaceholderText("Alias account…")
+        self.alias_edit.setPlaceholderText(t("accounts.alias_placeholder"))
         self.alias_edit.setFont(QFont("Segoe UI", 12, QFont.StyleItalic)) 
         
         # Applica stile Alias
@@ -1427,7 +1427,7 @@ class AccountsTab(QWidget):
         layout.setSpacing(15)
         
         # Titolo (senza icona, font ridotto)
-        self.title_label = QLabel("Gestione Account")
+        self.title_label = QLabel(t("accounts.title"))
         self.title_label.setFont(QFont("Segoe UI", 11, QFont.Bold))
         self.title_label.setStyleSheet("color: #f39c12;")
         layout.addWidget(self.title_label)
@@ -1435,7 +1435,7 @@ class AccountsTab(QWidget):
         layout.addStretch()
         
         # Totale accounts
-        self.total_accounts_label = QLabel("Totale Account: 0")
+        self.total_accounts_label = QLabel(t("accounts.total_accounts", count=0))
         self.total_accounts_label.setFont(QFont("Segoe UI", 9))
         self.total_accounts_label.setFixedHeight(32)
         self.total_accounts_label.setStyleSheet("""
@@ -1474,7 +1474,7 @@ class AccountsTab(QWidget):
                 border: 2px solid #95a5a6;
             }
         """)
-        self.refresh_btn.setToolTip("Ricarica account")
+        self.refresh_btn.setToolTip(t("accounts.reload_tooltip"))
         self.refresh_btn.clicked.connect(self.load_accounts)
         self.refresh_btn.setCursor(Qt.PointingHandCursor)
         layout.addWidget(self.refresh_btn)
@@ -1488,7 +1488,7 @@ class AccountsTab(QWidget):
     def load_accounts(self):
         """Carica gli account dal DB."""
         self.refresh_btn.setEnabled(False)
-        self.refresh_btn.setText("Caricamento...")
+        self.refresh_btn.setText(t("accounts.loading"))
         
         # Lancia il worker per caricare gli account dal DB
         worker = AccountsLoaderWorker()
@@ -1681,9 +1681,9 @@ class AccountsTab(QWidget):
                 cursor = db.cursor()
                 cursor.execute("SELECT COUNT(DISTINCT device_account) as total FROM accounts")
                 total_unique = cursor.fetchone()[0]
-                self.total_accounts_label.setText(f"Totale Account: {total_unique}")
+                self.total_accounts_label.setText(t("accounts.total_accounts", count=total_unique))
         except Exception as e:
-            self.total_accounts_label.setText(f"Totale Account: {len(accounts)}")
+            self.total_accounts_label.setText(t("accounts.total_accounts", count=len(accounts)))
         
         # Visualizza gli account nella GUI
         self._display_accounts(accounts, total_sets)
@@ -1731,13 +1731,13 @@ class AccountsTab(QWidget):
         icon.setAlignment(Qt.AlignCenter)
         layout.addWidget(icon)
         
-        title = QLabel("Nessun Account Trovato")
+        title = QLabel(t("accounts.no_accounts_title"))
         title.setFont(QFont("Segoe UI", 16, QFont.Bold))
         title.setStyleSheet(f"color: {Colors.DANGER};")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
         
-        message = QLabel("Aggiungi un account per iniziare.")
+        message = QLabel(t("accounts.no_accounts_message"))
         message.setFont(QFont("Segoe UI", 12))
         message.setStyleSheet(f"color: {Colors.MUTED};")
         message.setAlignment(Qt.AlignCenter)
@@ -1795,7 +1795,7 @@ class AccountsTab(QWidget):
 
     def _perform_search(self, search_term: str):
         """Esegue la ricerca in background."""
-        self.title_label.setText("Gestione Account (Ricerca...)")
+        self.title_label.setText(t("accounts.title_searching"))
         
         worker = SearchAccountsWorker(search_term)
         worker.signals.accounts_ready.connect(self._on_search_results)
@@ -1805,7 +1805,7 @@ class AccountsTab(QWidget):
     @pyqtSlot(list, int)
     def _on_search_results(self, accounts: List[Dict], total_sets: int):
         """Callback risultati ricerca."""
-        self.title_label.setText(f"Gestione Account (Trovati: {len(accounts)})")
+        self.title_label.setText(t("accounts.title_found", count=len(accounts)))
         self._display_accounts(accounts, total_sets)
 
     def _clear_search(self):
@@ -1871,7 +1871,7 @@ class AccountsTab(QWidget):
         
         # === CAMPO RICERCA (senza icone, senza bordo colorato) ===
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Cerca account per nome o alias (min. 3 caratteri)...")
+        self.search_input.setPlaceholderText(t("accounts.search_placeholder"))
         self.search_input.setFont(QFont("Segoe UI", 10))
         self.search_input.setMinimumWidth(300)
         self.search_input.setFixedHeight(32)
@@ -1905,14 +1905,14 @@ class AccountsTab(QWidget):
         layout.addWidget(separator)
         
         # === LABEL ORDINAMENTO ===
-        sort_label = QLabel("Ordina:")
+        sort_label = QLabel(t("accounts.sort_label"))
         sort_label.setFont(QFont("Segoe UI", 9))
         sort_label.setStyleSheet("color: #bdc3c7;")
         layout.addWidget(sort_label)
         
         # === FILTRO SHINY DUST (TOGGLE) ===
         self.sort_dust_btn = QPushButton()
-        self.sort_dust_btn.setToolTip("Ordina per Shiny Dust (clicca per alternare)")
+        self.sort_dust_btn.setToolTip(t("accounts.sort_by_dust_tooltip"))
         self.sort_dust_btn.setCursor(Qt.PointingHandCursor)
         self.sort_dust_btn.clicked.connect(lambda: self._toggle_sort('dust'))
         self._create_sort_button_with_icon(self.sort_dust_btn, SHINY_DUST_ICON_PATH)
@@ -1920,7 +1920,7 @@ class AccountsTab(QWidget):
         
         # === FILTRO HOURGLASSES (TOGGLE) ===
         self.sort_hourglass_btn = QPushButton()
-        self.sort_hourglass_btn.setToolTip("Ordina per Clessidre (clicca per alternare)")
+        self.sort_hourglass_btn.setToolTip(t("accounts.sort_by_hourglass_tooltip"))
         self.sort_hourglass_btn.setCursor(Qt.PointingHandCursor)
         self.sort_hourglass_btn.clicked.connect(lambda: self._toggle_sort('hourglass'))
         self._create_sort_button_with_icon(self.sort_hourglass_btn, HOURGLASS_ICON_PATH)

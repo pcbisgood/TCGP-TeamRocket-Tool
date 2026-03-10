@@ -27,7 +27,8 @@ from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QFont, QColor
 
 
-from config import DB_FILENAME, get_app_data_path 
+from config import DB_FILENAME, get_app_data_path
+from .translations import t 
 # ================================================================
 # 1. THREAD WORKER PER ESEGUIRE LO SCRIPT
 # ================================================================
@@ -140,7 +141,7 @@ class InjectWorker(QThread):
                 raise Exception("Impossibile riavviare l'app.")
             # ================================================================
             
-            self.log_signal.emit("\n🎉 Iniezione completata. L'app Pokémon si sta avviando.")
+            self.log_signal.emit("\n🎉 " + t("dialogs.injection_completed_message"))
             self.finished_signal.emit(True)
 
         except InterruptedError:
@@ -197,13 +198,13 @@ class InjectAccountDialog(QDialog):
 
     # ✅ setup_ui Semplificato (rimossa checkbox)
     def setup_ui(self):
-        self.setWindowTitle(f"Iniezione Account: {self.account_name}")
+        self.setWindowTitle(t("dialogs.injection_account_title", name=self.account_name))
         self.setMinimumSize(600, 450)
         self.setModal(True)
         
         layout = QVBoxLayout(self)
         
-        title_label = QLabel(f"Avvio iniezione ADB per {self.account_name}")
+        title_label = QLabel(t("dialogs.injection_start_title", name=self.account_name))
         title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         layout.addWidget(title_label)
         
@@ -217,7 +218,7 @@ class InjectAccountDialog(QDialog):
         
         # (Checkbox rimossa)
         
-        self.close_button = QPushButton("Chiudi")
+        self.close_button = QPushButton(t("dialogs.close_button"))
         self.close_button.setEnabled(False)
         
         button_box = QDialogButtonBox()
@@ -237,14 +238,14 @@ class InjectAccountDialog(QDialog):
         self.worker.log_signal.connect(self.log_output.append)
         self.worker.finished_signal.connect(self.on_injection_finished)
         
-        self.close_button.setText("In esecuzione...")
+        self.close_button.setText(t("dialogs.injection_running"))
         self.worker.start()
 
     # (on_injection_finished rimane invariato)
     def on_injection_finished(self, success: bool):
         if success:
-            self.log_output.append("\n✅ Iniezione terminata.")
-            self.close_button.setText("Fatto (Registra Scambio)")
+            self.log_output.append("\n✅ " + t("dialogs.injection_finished_log"))
+            self.close_button.setText(t("dialogs.injection_done"))
             self.close_button.setEnabled(True)
             self.close_button.setStyleSheet("background-color: #2E5A44; color: white;")
             try:
@@ -253,7 +254,7 @@ class InjectAccountDialog(QDialog):
                 pass
             self.close_button.clicked.connect(self.on_fatto_clicked)
         else:
-            self.close_button.setText("Chiudi (Errore)")
+            self.close_button.setText(t("dialogs.close_error"))
             self.close_button.setEnabled(True)
             self.close_button.setStyleSheet("background-color: #643A3A; color: white;")
             try:
@@ -267,15 +268,15 @@ class InjectAccountDialog(QDialog):
         """
         Chiede la quantità, logga su DB (entrambe le tabelle) e chiude.
         """
-        quantity, ok = QInputDialog.getInt(self, "Scambio Manuale", 
-                                           "Quante carte sono state scambiate?", 
+        quantity, ok = QInputDialog.getInt(self, t("dialogs.manual_trade_title"), 
+                                           t("dialogs.manual_trade_prompt"), 
                                            1, 1, 1000)
         
         if ok and quantity > 0:
             self.log_manual_trade(quantity)
             self._decrease_inventory_quantity(quantity) # <-- QUESTA È LA LOGICA CHE VOLEVI MANTENERE
         else:
-            self.log_output.append("ℹ️ Scambio non registrato dall'utente.")
+            self.log_output.append("ℹ️ " + t("dialogs.trade_not_registered_log"))
         
         # (Riavvio AHK rimosso)
         
@@ -359,7 +360,7 @@ class SimpleSelectionDialog(QDialog):
             active_ports: Set di porte attive (es. {"16416", "16417"})
         """
         super().__init__(parent)
-        self.setWindowTitle("Seleziona Istanza")
+        self.setWindowTitle(t("dialogs.select_instance_title"))
         self.setMinimumWidth(400) # Leggermente più largo
         self.setModal(True)
         
@@ -367,7 +368,7 @@ class SimpleSelectionDialog(QDialog):
         
         layout = QVBoxLayout(self)
         
-        label = QLabel("Seleziona l'istanza MuMu di destinazione:")
+        label = QLabel(t("dialogs.select_instance_label"))
         label.setStyleSheet("font-weight: bold; margin-bottom: 5px;")
         layout.addWidget(label)
         
@@ -385,13 +386,13 @@ class SimpleSelectionDialog(QDialog):
             
             if port in active_ports:
                 # 🟢 Attiva (Selezionabile)
-                item.setText(f"🟢 {item_text} [In Esecuzione]")
+                item.setText(f"🟢 {item_text} [{t('dialogs.instance_running')}]")
                 item.setForeground(QColor("#2ecc71"))
                 if first_active_item is None:
                     first_active_item = item # Salva per la selezione default
             else:
                 # 🔴 Spenta (Non selezionabile)
-                item.setText(f"🔴 {item_text} [Spenta]")
+                item.setText(f"🔴 {item_text} [{t('dialogs.instance_stopped')}]")
                 item.setForeground(QColor("#e74c3c"))
                 # Disabilita l'item
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
@@ -414,7 +415,7 @@ class SimpleSelectionDialog(QDialog):
         # Disabilita OK se non c'è nulla di attivo
         if first_active_item is None:
             self.buttons.button(QDialogButtonBox.Ok).setEnabled(False)
-            label.setText("Nessuna istanza MuMu attiva trovata:")
+            label.setText(t("dialogs.no_instance_active"))
 
     def accept(self):
         """Salva la porta selezionata prima di chiudere."""
